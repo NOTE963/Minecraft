@@ -62,9 +62,9 @@
   #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:2px; text-align:right; }
   #timeBadge { font-size:9px; opacity:.8; color:#fff; margin-top:1px; text-align:right; }
 
-  /* ★ 新しく作り直したリセットボタン */
+  /* ★ リセットボタン（ワンクリック） */
   #resetWorldBtn {
-    background:rgba(220,53,69,0.8);
+    background:rgba(220,53,69,0.85);
     border:2px solid rgba(255,255,255,0.6);
     color:#fff;
     padding:3px 14px;
@@ -108,19 +108,42 @@
   .abtn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
   #jumpBtn { width:68px; height:68px; font-size:13px; font-weight:700; }
 
+  /* ★ インベントリ（ホットバー） */
   #hotbar {
-    position:absolute; top:10px; left:50%; transform:translateX(-50%);
-    display:flex; gap:4px; background:rgba(0,0,0,.4); padding:5px 8px;
-    border-radius:10px; pointer-events:auto;
-    max-width:75vw;
+    position:absolute; bottom:120px; left:50%; transform:translateX(-50%);
+    display:flex; gap:5px; background:rgba(0,0,0,.55); padding:6px 10px;
+    border-radius:12px; pointer-events:auto;
+    max-width:80vw;
+    border:2px solid rgba(255,255,255,.15);
   }
   .hotslot {
-    width:38px; height:38px; flex:0 0 auto; border-radius:6px;
-    border:2px solid rgba(255,255,255,.4);
-    background:#555; overflow:hidden;
+    width:44px; height:44px; flex:0 0 auto; border-radius:8px;
+    border:3px solid rgba(255,255,255,.25);
+    background:rgba(50,50,50,.7);
+    overflow:hidden;
+    cursor:pointer;
+    transition:0.15s;
+    display:flex; align-items:center; justify-content:center;
   }
-  .hotslot.selected { border-color:#fff; box-shadow:0 0 8px rgba(255,255,255,.9); }
   .hotslot canvas { width:100%; height:100%; image-rendering:pixelated; }
+  .hotslot.selected { 
+    border-color:#fff; 
+    box-shadow:0 0 12px rgba(255,255,255,.7);
+    transform:scale(1.05);
+    background:rgba(100,100,100,.7);
+  }
+  .hotslot:active { transform:scale(0.92); }
+  .hotslot .block-label {
+    position:absolute;
+    bottom:2px;
+    font-size:6px;
+    color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,0.8);
+    background:rgba(0,0,0,.4);
+    padding:0 4px;
+    border-radius:2px;
+    white-space:nowrap;
+  }
 
   #lookLayer { position:absolute; inset:0; pointer-events:auto; }
 </style>
@@ -131,7 +154,7 @@
 
   <div id="startScreen">
     <h1>⛏ Mini Craft Online</h1>
-    <p>チャンク式無限ワールド。昼夜サイクル・地下深くまで探索可能。</p>
+    <p>チャンク式無限ワールド。昼夜サイクル・地下-5まで探索可能。</p>
     <input id="nameInput" maxlength="10" placeholder="ニックネーム" value="Craft">
     <button id="startBtn">ワールドに入る</button>
     <div id="startStatus">Firebase接続待機中...</div>
@@ -148,11 +171,11 @@
         <div id="coords">X:0 Y:0 Z:0</div>
         <div id="timeBadge">☀️ 昼</div>
         <div id="fpsBadge"></div>
-        <!-- ★ リセットボタン（新しく作り直し） -->
-        <button id="resetWorldBtn">🗑 ワールドリセット</button>
+        <button id="resetWorldBtn">🗑 リセット</button>
       </div>
     </div>
 
+    <!-- ★ インベントリ（ホットバー） -->
     <div id="hotbar"></div>
 
     <div id="lookLayer"></div>
@@ -250,7 +273,7 @@ function fbm(x,z,seed,octaves){
 }
 
 /* =========================================================
-   地形・バイオーム定義
+   地形・バイオーム定義（深さ-5に変更）
    ========================================================= */
 const AIR=0, GRASS=1, DIRT=2, STONE=3, WOOD=4, LEAVES=5, SAND=6, BEDROCK=7;
 const COBBLESTONE=8, PLANKS=9;
@@ -295,12 +318,15 @@ function columnTreeHeight(x,z){
   return 3 + Math.floor(hashInt(x+51, z+19, 321)*3);
 }
 
+/* ★ 深さを -5 に変更 */
+const BOTTOM_Y = -5;
+
 function terrainBlockAt(x,y,z){
   const biome = columnBiome(x,z);
   const h = columnHeight(x,z);
   
-  if(y <= -30) return BEDROCK;
-  if(y < -10) return STONE;
+  if(y <= BOTTOM_Y) return BEDROCK;
+  if(y < -2) return STONE;
   
   if(y >= h){
     for(let dx=-1;dx<=1;dx++) for(let dz=-1;dz<=1;dz++){
@@ -328,7 +354,7 @@ function terrainBlockAt(x,y,z){
 const overrides = new Map();
 function key(x,y,z){ return x+","+y+","+z; }
 function getBlock(x,y,z){
-  if(y < -30) return BEDROCK;
+  if(y <= BOTTOM_Y) return BEDROCK;
   if(y > 60) return AIR;
   const k = key(x,y,z);
   if(overrides.has(k)) return overrides.get(k);
@@ -446,7 +472,7 @@ const dummy = new THREE.Object3D();
    ========================================================= */
 const CHUNK_SIZE = 10;
 const RENDER_DIST = 2;
-const RENDER_DEPTH = 35;
+const RENDER_DEPTH = 15;
 const chunks = new Map();
 
 function createChunkMeshSet(){
@@ -486,7 +512,7 @@ function buildChunk(cx,cz){
     const x = startX+lx, z = startZ+lz;
     const h = columnHeight(x,z);
     const top = h + 4;
-    const bottom = -30;
+    const bottom = BOTTOM_Y;
     for(let y=bottom;y<top;y++){
       const k = key(x,y,z);
       if(overrides.has(k)) continue;
@@ -497,7 +523,7 @@ function buildChunk(cx,cz){
   overrides.forEach((type,k)=>{
     const parts = k.split(",").map(Number);
     const x=parts[0], y=parts[1], z=parts[2];
-    if(y < -30) return;
+    if(y <= BOTTOM_Y) return;
     if(x<startX || x>=startX+CHUNK_SIZE || z<startZ || z>=startZ+CHUNK_SIZE) return;
     if(type!==AIR) place(x,y,z,type);
   });
@@ -536,80 +562,43 @@ function invalidateAllChunks(){
 }
 
 /* =========================================================
-   ★ ワールドリセット処理（完全再実装） ★
+   ★ ワールドリセット（ワンクリック） ★
    ========================================================= */
 (function setupResetButton(){
   const resetBtn = document.getElementById('resetWorldBtn');
-  
-  if (!resetBtn) {
-    console.error('❌ リセットボタンが見つかりません');
-    return;
-  }
+  if (!resetBtn) return;
 
-  // 既存のイベントリスナーを削除（重複防止）
-  resetBtn.replaceWith(resetBtn.cloneNode(true));
-  const newResetBtn = document.getElementById('resetWorldBtn');
-
-  newResetBtn.addEventListener('click', async function() {
-    console.log('🔄 ワールドリセット開始');
-    
-    // 1回目の確認
-    if (!confirm('⚠️ 本当にワールドをリセットしますか？\n\n全てのブロックデータが消去され、元の地形に戻ります。')) {
-      console.log('❌ リセットキャンセル（1回目）');
-      return;
-    }
-    
-    // 2回目の確認
-    if (!confirm('🔥 最終確認：ワールドをリセットしますか？\nこの操作は取り消せません！')) {
-      console.log('❌ リセットキャンセル（2回目）');
+  resetBtn.addEventListener('click', async function() {
+    // ★ 確認は1回だけ
+    if (!confirm('🗑 ワールドをリセットしますか？\n全てのブロックが元の地形に戻ります。')) {
       return;
     }
 
-    // ボタンを無効化
     this.disabled = true;
-    this.textContent = '⏳ リセット中...';
+    this.textContent = '⏳...';
     this.style.opacity = '0.5';
 
     try {
-      // ★ 1. Firebaseのブロックデータを完全削除（remove()を使用）
-      console.log('🗑️ Firebaseデータ削除開始...');
       await db.ref(ROOM + '/blocks').remove();
-      console.log('✅ Firebaseブロックデータ完全削除完了');
-
-      // ★ 2. ローカルのオーバーライドをクリア
       overrides.clear();
-      console.log('✅ ローカルデータクリア完了');
-
-      // ★ 3. チャンクを再構築
-      console.log('🔄 チャンク再構築開始...');
       invalidateAllChunks();
       updateChunks();
-      console.log('✅ チャンク再構築完了');
-
-      // ★ 4. プレイヤーを安全な位置に移動
+      
       const resetX = Math.floor(player.pos.x);
       const resetZ = Math.floor(player.pos.z);
       const resetY = columnHeight(resetX, resetZ) + 3;
       player.pos.set(resetX + 0.5, resetY, resetZ + 0.5);
       player.vel.set(0, 0, 0);
-      console.log('✅ プレイヤー位置リセット完了');
 
-      // ★ 5. 成功メッセージ
-      alert('✅ ワールドがリセットされました！');
-
+      alert('✅ リセット完了！');
     } catch (error) {
-      console.error('❌ リセットエラー:', error);
-      alert('❌ リセットに失敗しました: ' + error.message);
+      alert('❌ エラー: ' + error.message);
     }
 
-    // ボタンを再有効化
     this.disabled = false;
-    this.textContent = '🗑 ワールドリセット';
+    this.textContent = '🗑 リセット';
     this.style.opacity = '1';
-    console.log('🔄 ワールドリセット処理終了');
   });
-
-  console.log('✅ リセットボタンが正常に設定されました');
 })();
 
 /* =========================================================
@@ -620,7 +609,7 @@ db.ref(ROOM + "/blocks").on("value", snap=>{
   overrides.clear();
   Object.keys(val).forEach(k=>{
     const parts = k.split("_").map(Number);
-    if(parts[1] < -30) return;
+    if(parts[1] <= BOTTOM_Y) return;
     overrides.set(parts.join(","), val[k]);
   });
   invalidateAllChunks();
@@ -628,7 +617,7 @@ db.ref(ROOM + "/blocks").on("value", snap=>{
 });
 
 function pushBlockChange(x,y,z,type){
-  if(y < -30) return;
+  if(y <= BOTTOM_Y) return;
   overrides.set(key(x,y,z), type);
   invalidateAllChunks();
   updateChunks();
@@ -737,27 +726,50 @@ const input = { moveX:0, moveY:0, jump:false };
 document.getElementById("jumpBtn").addEventListener("touchstart", e=>{ e.preventDefault(); input.jump = true; }, {passive:false});
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump = true);
 
+/* ★ インベントリ（ホットバー）ブロック選択 */
 let selectedType = GRASS;
-const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND, COBBLESTONE, PLANKS];
+const HOTBAR_BLOCKS = [
+  { id: GRASS, name: '草' },
+  { id: DIRT, name: '土' },
+  { id: STONE, name: '石' },
+  { id: WOOD, name: '木材' },
+  { id: LEAVES, name: '葉' },
+  { id: SAND, name: '砂' },
+  { id: COBBLESTONE, name: '丸石' },
+  { id: PLANKS, name: '板材' }
+];
+
 (function setupHotbar(){
   const bar = document.getElementById("hotbar");
-  HOTBAR_BLOCKS.forEach((t,i)=>{
+  bar.innerHTML = '';
+  HOTBAR_BLOCKS.forEach((blockInfo, i)=>{
     const slot = document.createElement("div");
-    slot.className = "hotslot" + (i===0 ? " selected":"");
-    const c = document.createElement("canvas"); c.width=16; c.height=16;
+    slot.className = "hotslot" + (i === 0 ? " selected" : "");
+    slot.style.position = 'relative';
+    
+    const c = document.createElement("canvas");
+    c.width = 16; c.height = 16;
     const ctx = c.getContext("2d");
-    const def = BLOCK_DEFS[t];
+    const def = BLOCK_DEFS[blockInfo.id];
     if(def){
       const m = Array.isArray(def.materials) ? def.materials[2] : def.materials;
-      if(m && m.map) ctx.drawImage(m.map.image, 0,0);
+      if(m && m.map) ctx.drawImage(m.map.image, 0, 0);
     }
     slot.appendChild(c);
+    
+    // ブロック名ラベル
+    const label = document.createElement("span");
+    label.className = "block-label";
+    label.textContent = blockInfo.name;
+    slot.appendChild(label);
+    
     slot.addEventListener("touchstart", e=>{ e.preventDefault(); select(); }, {passive:false});
     slot.addEventListener("mousedown", select);
+    
     function select(){
-      selectedType = t;
-      Array.from(bar.children).forEach(ch=>ch.classList.remove("selected"));
-      slot.classList.add("selected");
+      selectedType = blockInfo.id;
+      document.querySelectorAll('.hotslot').forEach(ch=>ch.classList.remove('selected'));
+      slot.classList.add('selected');
     }
     bar.appendChild(slot);
   });
@@ -808,7 +820,7 @@ function doPlace(){
   const nx = hit.x + Math.round(hit.normal.x);
   const ny = hit.y + Math.round(hit.normal.y);
   const nz = hit.z + Math.round(hit.normal.z);
-  if(ny < -30) return;
+  if(ny <= BOTTOM_Y) return;
   const dx = Math.abs(nx+0.5-player.pos.x), dy = Math.abs(ny+0.5-player.pos.y-0.8), dz = Math.abs(nz+0.5-player.pos.z);
   if(dx<0.6 && dy<1.2 && dz<0.6) return;
   const block = getBlock(nx, ny, nz);
@@ -882,7 +894,7 @@ playersRef.on("value", snap=>{
 });
 
 /* =========================================================
-   昼夜サイクル（明るさ調整済み）
+   昼夜サイクル
    ========================================================= */
 const DAY_LENGTH = 120;
 let timeOfDay = 0;
@@ -918,7 +930,7 @@ function updateDayNightCycle(dt){
 }
 
 /* =========================================================
-   メインループ（軽量化）
+   メインループ
    ========================================================= */
 const clock = new THREE.Clock();
 const SPEED = 4.3, GRAVITY = 20, JUMP_V = 7.2;
@@ -961,7 +973,7 @@ function animate(){
     if(player.vel.y < 0) player.onGround = true;
     player.vel.y = 0;
   }
-  if(player.pos.y < -40){
+  if(player.pos.y < BOTTOM_Y - 5){
     const resetX = Math.floor(player.pos.x);
     const resetZ = Math.floor(player.pos.z);
     player.pos.y = columnHeight(resetX, resetZ) + 3;
