@@ -129,7 +129,7 @@
 
   <div id="startScreen">
     <h1>⛏ Mini Craft Online</h1>
-    <p>チャンク式無限ワールド。昼夜サイクル・地下深くまで探索可能。</p>
+    <p>チャンク式無限ワールド。プレイヤー同期のみ（ブロックは保存されません）</p>
     <input id="nameInput" maxlength="10" placeholder="ニックネーム" value="Craft">
     <button id="startBtn">ワールドに入る</button>
     <div id="startStatus">Firebase接続待機中...</div>
@@ -296,15 +296,10 @@ function terrainBlockAt(x,y,z){
   const biome = columnBiome(x,z);
   const h = columnHeight(x,z);
   
-  // ★ 岩盤（一番下）
   if(y <= -30) return BEDROCK;
-  
-  // 地下深くは石
   if(y < -10) return STONE;
   
-  // 地表以上
   if(y >= h){
-    // 木
     for(let dx=-1;dx<=1;dx++) for(let dz=-1;dz<=1;dz++){
       const nx=x+dx, nz=z+dz;
       const nb = columnBiome(nx,nz);
@@ -319,21 +314,18 @@ function terrainBlockAt(x,y,z){
     return AIR;
   }
   
-  // 地表下
   if(y === h-1) return surfaceBlockFor(biome,h);
-  
-  // 土/石
   if(y >= h-5) return (biome===BIOME_DESERT ? SAND : DIRT);
   return STONE;
 }
 
 /* =========================================================
-   ワールド差分（Firebase同期）
+   ワールド状態（ローカルメモリのみ）
    ========================================================= */
 const overrides = new Map();
 function key(x,y,z){ return x+","+y+","+z; }
 function getBlock(x,y,z){
-  if(y < -30) return BEDROCK; // 岩盤は絶対に変更不可
+  if(y < -30) return BEDROCK;
   if(y > 60) return AIR;
   const k = key(x,y,z);
   if(overrides.has(k)) return overrides.get(k);
@@ -544,10 +536,21 @@ function invalidateAllChunks(){
 }
 
 /* =========================================================
-   ★ ワールドリセット処理 ★
+   ★ ブロック変更（ローカルメモリのみ、Firebase保存なし） ★
+   ========================================================= */
+function pushBlockChange(x,y,z,type){
+  if(y < -30) return;
+  overrides.set(key(x,y,z), type);
+  invalidateAllChunks();
+  updateChunks();
+  // ★ Firebaseには保存しない
+}
+
+/* =========================================================
+   ★ ワールドリセット（ローカルデータのみクリア） ★
    ========================================================= */
 document.getElementById('resetWorldBtn').addEventListener('click', async function() {
-  if (!confirm('⚠️ 本当にワールドをリセットしますか？\n\n全てのブロックデータが消去され、元の地形に戻ります。')) {
+  if (!confirm('⚠️ 本当にワールドをリセットしますか？\n\n全てのブロック変更が消去され、元の地形に戻ります。')) {
     return;
   }
   
@@ -561,19 +564,6 @@ document.getElementById('resetWorldBtn').addEventListener('click', async functio
   btn.style.opacity = '0.5';
 
   try {
-    // Firebaseのブロックデータを全て削除
-    const snapshot = await db.ref(ROOM + '/blocks').once('value');
-    const data = snapshot.val();
-    
-    if (data) {
-      const updates = {};
-      Object.keys(data).forEach(key => {
-        updates[key] = null;
-      });
-      await db.ref(ROOM + '/blocks').update(updates);
-      console.log('✅ ワールドリセット完了');
-    }
-
     // ローカルのオーバーライドをクリア
     overrides.clear();
     
@@ -597,29 +587,6 @@ document.getElementById('resetWorldBtn').addEventListener('click', async functio
   btn.textContent = '🌍 ワールドリセット';
   btn.style.opacity = '1';
 });
-
-/* =========================================================
-   Firebase差分同期
-   ========================================================= */
-db.ref(ROOM + "/blocks").on("value", snap=>{
-  const val = snap.val() || {};
-  overrides.clear();
-  Object.keys(val).forEach(k=>{
-    const parts = k.split("_").map(Number);
-    if(parts[1] < -30) return;
-    overrides.set(parts.join(","), val[k]);
-  });
-  invalidateAllChunks();
-  updateChunks();
-});
-
-function pushBlockChange(x,y,z,type){
-  if(y < -30) return;
-  overrides.set(key(x,y,z), type);
-  invalidateAllChunks();
-  updateChunks();
-  db.ref(ROOM + "/blocks/" + x + "_" + y + "_" + z).set(type);
-}
 
 /* =========================================================
    プレイヤー
@@ -802,7 +769,7 @@ function doPlace(){
 }
 
 /* =========================================================
-   他プレイヤー表示
+   他プレイヤー表示（Firebase同期）
    ========================================================= */
 const otherPlayers = {};
 function makeNameSprite(name, colorHex){
