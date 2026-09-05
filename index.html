@@ -64,6 +64,48 @@
   #controlsInfo{margin-top:22px;font-size:12px;color:#28381f;text-align:center;line-height:1.7;background:rgba(255,255,255,0.35);padding:10px 18px;border-radius:8px;}
 
   #status{position:fixed;bottom:10px;left:10px;color:#fff;font-size:11px;z-index:10;text-shadow:0 1px 2px rgba(0,0,0,0.8);pointer-events:none;}
+
+  /* ---- スマホを強制的に横画面表示にする（CSS回転ハック） ---- */
+  @media screen and (orientation: portrait) and (pointer: coarse) {
+    html {
+      width: 100vh;
+      height: 100vw;
+      transform: rotate(90deg);
+      transform-origin: top left;
+      position: absolute;
+      top: 0;
+      left: 100%;
+      overflow: hidden;
+    }
+  }
+
+  /* ---- タッチ操作UI（PCでは非表示） ---- */
+  #touchControls{display:none;}
+  body.is-touch #touchControls{display:block;}
+  body.is-touch #controlsInfo{display:none;}
+
+  #touchLookZone{
+    position:fixed;top:0;right:0;width:60%;height:100%;z-index:8;
+  }
+  #joystickBase{
+    position:fixed;left:26px;bottom:26px;width:110px;height:110px;
+    border-radius:50%;background:rgba(255,255,255,0.18);
+    border:2px solid rgba(255,255,255,0.4);z-index:9;
+  }
+  #joystickKnob{
+    position:absolute;left:35px;top:35px;width:40px;height:40px;
+    border-radius:50%;background:rgba(255,255,255,0.55);
+    border:2px solid rgba(255,255,255,0.7);
+  }
+  .touchBtn{
+    position:fixed;width:64px;height:64px;border-radius:50%;
+    background:rgba(20,20,20,0.4);border:2px solid rgba(255,255,255,0.55);
+    color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;
+    z-index:9;user-select:none;-webkit-user-select:none;
+  }
+  #btnJump{right:96px;bottom:110px;}
+  #btnPlace{right:20px;bottom:110px;}
+  #btnBreak{right:96px;bottom:26px;}
 </style>
 </head>
 <body>
@@ -90,6 +132,14 @@
   <div class="slot" data-type="dirt"><div class="swatch" style="background:#8b5a2b;"></div>土</div>
   <div class="slot" data-type="stone"><div class="swatch" style="background:#8a8a8a;"></div>石</div>
   <div class="slot" data-type="wood"><div class="swatch" style="background:#6b4423;"></div>木</div>
+</div>
+
+<div id="touchControls">
+  <div id="touchLookZone"></div>
+  <div id="joystickBase"><div id="joystickKnob"></div></div>
+  <div class="touchBtn" id="btnJump">⤴</div>
+  <div class="touchBtn" id="btnBreak">⛏</div>
+  <div class="touchBtn" id="btnPlace">🧱</div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -170,11 +220,22 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.7);
 sun.position.set(50, 80, 30);
 scene.add(sun);
 
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+if (isTouch) document.body.classList.add("is-touch");
+
+function isRotatedPortrait() {
+  return window.matchMedia("(orientation: portrait) and (pointer: coarse)").matches;
+}
+function updateRendererSize() {
+  let w = window.innerWidth, h = window.innerHeight;
+  if (isRotatedPortrait()) { const t = w; w = h; h = t; } // CSS回転ハックに合わせて幅高さを入れ替える
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  renderer.setSize(w, h);
+}
+window.addEventListener("resize", updateRendererSize);
+window.addEventListener("orientationchange", updateRendererSize);
+updateRendererSize();
 
 /* ============================================================
    チャンク管理
@@ -377,10 +438,85 @@ document.querySelectorAll(".slot").forEach((el) => {
   el.addEventListener("click", () => selectSlot(el.dataset.type));
 });
 
+/* ---- タッチ操作（スマホ） ---- */
+const touchJoystick = { active: false, x: 0, y: 0, id: null };
+const joystickBase = document.getElementById("joystickBase");
+const joystickKnob = document.getElementById("joystickKnob");
+const JOY_RADIUS = 42;
+
+joystickBase.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  touchJoystick.active = true;
+  touchJoystick.id = t.identifier;
+  touchJoystick.originX = t.clientX;
+  touchJoystick.originY = t.clientY;
+}, { passive: false });
+
+function handleJoystickMove(t) {
+  const dx = t.clientX - touchJoystick.originX;
+  const dy = t.clientY - touchJoystick.originY;
+  const dist = Math.min(JOY_RADIUS, Math.hypot(dx, dy));
+  const ang = Math.atan2(dy, dx);
+  const kx = Math.cos(ang) * dist, ky = Math.sin(ang) * dist;
+  joystickKnob.style.transform = `translate(${kx}px, ${ky}px)`;
+  touchJoystick.x = kx / JOY_RADIUS;
+  touchJoystick.y = ky / JOY_RADIUS;
+}
+window.addEventListener("touchmove", (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchJoystick.id) { handleJoystickMove(t); e.preventDefault(); }
+    if (t.identifier === lookTouch.id) { handleLookMove(t); e.preventDefault(); }
+  }
+}, { passive: false });
+window.addEventListener("touchend", (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchJoystick.id) {
+      touchJoystick.active = false; touchJoystick.id = null; touchJoystick.x = 0; touchJoystick.y = 0;
+      joystickKnob.style.transform = "translate(0,0)";
+    }
+    if (t.identifier === lookTouch.id) { lookTouch.id = null; }
+  }
+});
+
+const lookTouch = { id: null, lastX: 0, lastY: 0 };
+document.getElementById("touchLookZone").addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  lookTouch.id = t.identifier;
+  lookTouch.lastX = t.clientX;
+  lookTouch.lastY = t.clientY;
+}, { passive: false });
+function handleLookMove(t) {
+  const dx = t.clientX - lookTouch.lastX;
+  const dy = t.clientY - lookTouch.lastY;
+  lookTouch.lastX = t.clientX;
+  lookTouch.lastY = t.clientY;
+  const sens = 0.0045;
+  player.yaw -= dx * sens;
+  player.pitch -= dy * sens;
+  player.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, player.pitch));
+}
+
+document.getElementById("btnJump").addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  if (player.onGround) player.vy = 7.2;
+});
+document.getElementById("btnBreak").addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const hit = raycastVoxel();
+  if (hit) breakBlockAt(hit.x, hit.z);
+});
+document.getElementById("btnPlace").addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const hit = raycastVoxel();
+  if (hit) placeBlockAt(hit.x, hit.z, player.selected);
+});
+
 const canvas = renderer.domElement;
 let pointerLocked = false;
 canvas.addEventListener("click", () => {
-  if (!pointerLocked) canvas.requestPointerLock();
+  if (!isTouch && !pointerLocked) canvas.requestPointerLock();
 });
 document.addEventListener("pointerlockchange", () => {
   pointerLocked = (document.pointerLockElement === canvas);
@@ -436,6 +572,10 @@ function updatePlayer(dt) {
   if (keys["KeyS"]) move.add(forward);
   if (keys["KeyA"]) move.sub(right);
   if (keys["KeyD"]) move.add(right);
+  if (touchJoystick.active) {
+    move.add(forward.clone().multiplyScalar(-touchJoystick.y));
+    move.add(right.clone().multiplyScalar(touchJoystick.x));
+  }
   if (move.lengthSq() > 0) {
     move.normalize().multiplyScalar(player.moveSpeed * dt);
     player.x += move.x;
@@ -577,7 +717,22 @@ document.getElementById("startBtn").addEventListener("click", () => {
 
   updateLoadedChunks(player.x, player.z);
   initMultiplayer();
-  canvas.requestPointerLock();
+
+  if (isTouch) {
+    // フルスクリーン化＋横画面ロックを試みる（対応ブラウザのみ。失敗してもCSSの回転ハックで横画面表示される）
+    const root = document.documentElement;
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (req) {
+      req.call(root).then(() => {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock("landscape").catch(() => {});
+        }
+      }).catch(() => {});
+    }
+    updateRendererSize();
+  } else {
+    canvas.requestPointerLock();
+  }
   animate();
 });
 </script>
