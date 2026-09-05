@@ -7,6 +7,19 @@
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
   html, body { width:100%; height:100%; overflow:hidden; background:#87ceeb; font-family:'Segoe UI', 'Hiragino Sans', sans-serif; touch-action:none; }
+
+  /* ---------- 強制横画面ラッパー ----------
+     screen.orientation.lock() が使えない端末(主にiOS)向けに、
+     縦持ちのときはアプリ全体をCSSで90度回転させて横画面として表示する。 */
+  #appWrapper { position:fixed; top:0; left:0; width:100%; height:100%; transform-origin:top left; }
+  @media (orientation:portrait){
+    #appWrapper {
+      width:100vh;
+      height:100vw;
+      transform: rotate(90deg) translateY(-100%);
+    }
+  }
+
   #gameCanvas { display:block; width:100%; height:100%; }
 
   /* ---------- スタート画面 ---------- */
@@ -81,6 +94,8 @@
 </head>
 <body>
 
+<div id="appWrapper">
+
 <div id="startScreen">
   <h1>⛏ Mini Craft Online</h1>
   <p>できるだけ軽量に再現したMinecraft風ワールドです。ブロックを壊す・置く・仲間とリアルタイム同期ができます。スマホの縦持ち／横持ち両対応。</p>
@@ -113,6 +128,8 @@
 </div>
 
 <canvas id="gameCanvas"></canvas>
+
+</div><!-- /appWrapper -->
 
 <script>
 // ------------------------------------------------------------
@@ -284,7 +301,11 @@ sun.position.set(15, 25, 10);
 scene.add(sun);
 
 function resize(){
-  const w = innerWidth, h = innerHeight;
+  // #appWrapper は縦持ち時にCSSで90度回転しているため、
+  // clientWidth/clientHeight(回転前のボックスサイズ)を使うと常に
+  // 見た目どおりの横長サイズが取得できる。
+  const wrapper = document.getElementById("appWrapper");
+  const w = wrapper.clientWidth, h = wrapper.clientHeight;
   renderer.setSize(w,h,false);
   camera.aspect = w/h;
   camera.updateProjectionMatrix();
@@ -402,20 +423,22 @@ queueRebuild();
 /* =========================================================
    Firebaseからのブロック差分同期
    ========================================================= */
-db.ref(ROOM + "/blocks").on("value", snap=>{
-  const val = snap.val() || {};
-  overrides.clear();
-  Object.keys(val).forEach(k=>{
-    const parts = k.split("_").map(Number);
-    overrides.set(parts.join(","), val[k]);
+if(db){
+  db.ref(ROOM + "/blocks").on("value", snap=>{
+    const val = snap.val() || {};
+    overrides.clear();
+    Object.keys(val).forEach(k=>{
+      const parts = k.split("_").map(Number);
+      overrides.set(parts.join(","), val[k]);
+    });
+    queueRebuild();
   });
-  queueRebuild();
-});
+}
 
 function pushBlockChange(x,y,z,type){
   setLocalBlock(x,y,z,type);
   queueRebuild();
-  db.ref(ROOM + "/blocks/" + x + "_" + y + "_" + z).set(type);
+  if(db) db.ref(ROOM + "/blocks/" + x + "_" + y + "_" + z).set(type);
 }
 
 /* =========================================================
@@ -611,11 +634,12 @@ function createOtherPlayerMesh(name, colorHex){
   return group;
 }
 
-const playersRef = db.ref(ROOM + "/players");
-playersRef.child(myId).onDisconnect().remove();
+const playersRef = db ? db.ref(ROOM + "/players") : null;
+if(playersRef) playersRef.child(myId).onDisconnect().remove();
 
 let lastSent = 0;
 function sendMyState(now){
+  if(!playersRef) return;
   if(now - lastSent < 120) return;
   lastSent = now;
   playersRef.child(myId).set({
@@ -624,7 +648,7 @@ function sendMyState(now){
   });
 }
 
-playersRef.on("value", snap=>{
+if(playersRef) playersRef.on("value", snap=>{
   const val = snap.val() || {};
   const activeIds = new Set(Object.keys(val));
   // 追加/更新
@@ -649,6 +673,9 @@ playersRef.on("value", snap=>{
   const list = Object.values(val).filter(d=>d).map(d=>d.name||"?");
   document.getElementById("playerList").textContent = "👥 " + (list.length||1) + "人: " + (list.join(", ")||myName);
 });
+if(!playersRef){
+  document.getElementById("playerList").textContent = "👥 1人(オフライン): " + myName;
+}
 
 /* =========================================================
    メインループ
@@ -709,9 +736,25 @@ function animate(){
 /* =========================================================
    開始処理
    ========================================================= */
-document.getElementById("startBtn").addEventListener("click", ()=>{
+async function tryForceLandscape(){
+  // Android Chrome等: フルスクリーン化してから画面の向きを横に固定する。
+  // iOS Safari等、APIが無い/失敗する端末はCSSの回転フォールバックで見た目上の横画面になる。
+  try{
+    const el = document.documentElement;
+    if(el.requestFullscreen) await el.requestFullscreen();
+    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }catch(e){ /* フルスクリーン非対応・拒否時は無視 */ }
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      await screen.orientation.lock("landscape");
+    }
+  }catch(e){ /* ロック非対応時はCSS回転フォールバックのみで対応 */ }
+}
+
+document.getElementById("startBtn").addEventListener("click", async ()=>{
   const nameVal = document.getElementById("nameInput").value.trim();
   myName = nameVal || ("Player" + Math.floor(Math.random()*999));
+  await tryForceLandscape();
   document.getElementById("startScreen").style.display = "none";
   document.getElementById("hud").style.display = "block";
   resize();
