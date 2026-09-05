@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Mini Craft Online</title>
+<title>Mini Craft Online - フリーモード</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
   html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Segoe UI', 'Hiragino Sans', sans-serif; touch-action:none; }
@@ -20,7 +20,6 @@
 
   #gameCanvas { display:block; width:100%; height:100%; }
 
-  /* スタート画面 */
   #startScreen {
     position:absolute; inset:0; z-index:50;
     background:linear-gradient(180deg,#5b8def 0%,#a3d0f0 60%,#8ec96b 100%);
@@ -50,7 +49,6 @@
   #crosshair::before { left:7px; top:0; width:2px; height:16px; }
   #crosshair::after { top:7px; left:0; height:2px; width:16px; }
 
-  /* トップバー */
   #topBar {
     position:absolute; top:12px; left:12px; right:12px;
     display:flex; justify-content:space-between; align-items:center;
@@ -69,7 +67,6 @@
   }
   #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:1px; text-align:right; }
 
-  /* ジョイスティック */
   #joyBase {
     position:absolute; left:40px; bottom:40px;
     width:90px; height:90px; border-radius:50%;
@@ -82,7 +79,6 @@
     background:rgba(255,255,255,.55); border:2px solid rgba(255,255,255,.7);
   }
 
-  /* アクションボタン */
   #actionArea {
     position:absolute; right:40px; bottom:40px;
     display:flex; flex-direction:column; align-items:flex-end; gap:10px;
@@ -98,7 +94,7 @@
   .abtn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
   #jumpBtn { width:66px; height:66px; font-size:12px; font-weight:700; }
 
-  /* インベントリ + ブロック選択UI */
+  /* ★ インベントリ表示（制限なし → 所持数表示のみ） */
   #inventoryArea {
     position:absolute; bottom:115px; left:50%; transform:translateX(-50%);
     display:flex; align-items:center; gap:10px;
@@ -115,7 +111,6 @@
   }
   .inv-item .count { font-weight:700; color:#ffd700; min-width:18px; text-align:center; }
 
-  /* ★ ブロック選択矢印 */
   .block-nav-btn {
     width:32px; height:32px; border-radius:50%;
     background:rgba(255,255,255,.15); border:2px solid rgba(255,255,255,.3);
@@ -124,7 +119,6 @@
   }
   .block-nav-btn:active { background:rgba(255,255,255,.3); transform:scale(0.92); }
 
-  /* ★ 選択中のブロック表示 */
   #selectedBlockPreview {
     width:36px; height:36px; border-radius:6px;
     border:2px solid #fff; background:#555;
@@ -133,7 +127,6 @@
   }
   #selectedBlockPreview canvas { width:100%; height:100%; }
 
-  /* ホットバー（軽量化でスリムに） */
   #hotbar {
     position:absolute; top:12px; left:50%; transform:translateX(-50%);
     display:flex; gap:3px; background:rgba(0,0,0,.35); padding:3px 6px;
@@ -157,7 +150,6 @@
 
   #lookLayer { position:absolute; inset:0; pointer-events:auto; }
 
-  /* ★ ワールドリセットボタン（設定用） */
   #resetBtn {
     position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
     background:rgba(220,50,50,.7); border:2px solid rgba(255,255,255,.5);
@@ -174,7 +166,7 @@
 
   <div id="startScreen">
     <h1>⛏ Mini Craft Online</h1>
-    <p>チャンク式無限ワールド。地下深くまで掘り下げよう！<br>ブロックはUIから選択できます。</p>
+    <p>フリーモード！ブロック制限なしで自由に建築</p>
     <input id="nameInput" maxlength="10" placeholder="ニックネーム" value="Craft">
     <button id="startBtn">ワールドに入る</button>
     <div id="startStatus">Firebase接続待機中...</div>
@@ -197,7 +189,6 @@
 
     <div id="hotbar"></div>
 
-    <!-- ★ インベントリ + ブロック選択UI -->
     <div id="inventoryArea">
       <div class="block-nav-btn" id="blockPrev">◀</div>
       <div id="selectedBlockPreview"></div>
@@ -218,7 +209,6 @@
       <div class="abtn" id="jumpBtn">JUMP</div>
     </div>
 
-    <!-- ★ ワールドリセットボタン -->
     <button id="resetBtn">🗑 ワールドリセット</button>
   </div>
 
@@ -305,7 +295,7 @@ function fbm(x,z,seed,octaves){
 }
 
 /* =========================================================
-   地形・バイオーム定義
+   地形・バイオーム定義（地下を浅く: y=-25まで）
    ========================================================= */
 const AIR=0, GRASS=1, DIRT=2, STONE=3, WOOD=4, LEAVES=5, SAND=6, BEDROCK=7;
 
@@ -353,7 +343,8 @@ function terrainBlockAt(x,y,z){
   const biome = columnBiome(x,z);
   const h = columnHeight(x,z);
   
-  if(y <= -45) return BEDROCK;
+  // ★ 岩盤（y=-22以下、壊せない）
+  if(y <= -22) return BEDROCK;
   
   if(y >= h){
     for(let dx=-1;dx<=1;dx++) for(let dz=-1;dz<=1;dz++){
@@ -376,7 +367,7 @@ function terrainBlockAt(x,y,z){
 }
 
 /* =========================================================
-   インベントリ
+   ★ インベントリ（制限なし：表示用のみ）
    ========================================================= */
 const inventory = {};
 const BLOCK_NAMES = {
@@ -385,10 +376,11 @@ const BLOCK_NAMES = {
   [BEDROCK]: "岩盤"
 };
 
-// ★ 選択可能なブロック（岩盤は除外）
+// ★ 選択可能なブロック（岩盤以外すべて）
 const SELECTABLE_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
 let selectedType = GRASS;
 
+// ★ ブロックを掘ったらインベントリに追加（ただし制限なし）
 function addToInventory(type, count){
   if(type === AIR || type === BEDROCK) return;
   if(!inventory[type]) inventory[type] = 0;
@@ -396,16 +388,15 @@ function addToInventory(type, count){
   updateUI();
 }
 
-function getInventoryCount(type){
-  return inventory[type] || 0;
-}
-
+// ★ 設置時はインベントリを消費しない（制限なし）
 function useFromInventory(type){
   if(type === BEDROCK) return false;
-  if(!inventory[type] || inventory[type] <= 0) return false;
-  inventory[type]--;
-  updateUI();
+  // 制限なし：常にtrueを返す
   return true;
+}
+
+function getInventoryCount(type){
+  return inventory[type] || 0;
 }
 
 function updateUI(){
@@ -420,7 +411,7 @@ function updateUI(){
 const overrides = new Map();
 function key(x,y,z){ return x+","+y+","+z; }
 function getBlock(x,y,z){
-  if(y < -50) return BEDROCK;
+  if(y < -28) return BEDROCK;
   if(y > 60) return AIR;
   const k = key(x,y,z);
   if(overrides.has(k)) return overrides.get(k);
@@ -446,7 +437,6 @@ scene.fog = new THREE.Fog(0x8fc7f0, 18, 50);
 const camera = new THREE.PerspectiveCamera(65, 16/9, 0.1, 80);
 camera.rotation.order = "YXZ";
 
-// 照明（軽量化）
 const sun = new THREE.DirectionalLight(0xfff3d0, 0.8);
 sun.position.set(15, 25, 10);
 scene.add(sun);
@@ -487,7 +477,7 @@ window.addEventListener("resize", ()=>setTimeout(resize,50));
 resize();
 
 /* =========================================================
-   ブロックテクスチャ（軽量化）
+   ブロックテクスチャ（軽量化 8x8）
    ========================================================= */
 function makeTexture(draw){
   const c = document.createElement("canvas"); c.width = 8; c.height = 8;
@@ -536,7 +526,7 @@ const boxGeo = new THREE.BoxGeometry(1,1,1);
 const BLOCK_DEFS = {
   [GRASS]: { materials: [M_GRASS_SIDE,M_GRASS_SIDE,M_GRASS_TOP,M_DIRT,M_GRASS_SIDE,M_GRASS_SIDE], chunkMax: 200 },
   [DIRT]:  { materials: M_DIRT, chunkMax: 400 },
-  [STONE]: { materials: M_STONE, chunkMax: 1000 },
+  [STONE]: { materials: M_STONE, chunkMax: 800 },
   [WOOD]:  { materials: [M_WOOD_SIDE,M_WOOD_SIDE,M_WOOD_TOP,M_WOOD_TOP,M_WOOD_SIDE,M_WOOD_SIDE], chunkMax: 80 },
   [LEAVES]:{ materials: M_LEAVES, chunkMax: 200 },
   [SAND]:  { materials: M_SAND, chunkMax: 200 },
@@ -549,7 +539,7 @@ const dummy = new THREE.Object3D();
    ========================================================= */
 const CHUNK_SIZE = 10;
 const RENDER_DIST = 2;
-const RENDER_DEPTH = 16;
+const RENDER_DEPTH = 14;
 const chunks = new Map();
 
 function createChunkMeshSet(){
@@ -589,7 +579,7 @@ function buildChunk(cx,cz){
     const x = startX+lx, z = startZ+lz;
     const h = columnHeight(x,z);
     const top = h + 5;
-    const bottom = -45;
+    const bottom = -25; // ★ 地下を浅く
     for(let y=bottom;y<top;y++){
       const k = key(x,y,z);
       if(overrides.has(k)) continue;
@@ -659,7 +649,7 @@ function pushBlockChange(x,y,z,type){
 }
 
 /* =========================================================
-   ★ ワールドリセット
+   ワールドリセット
    ========================================================= */
 function resetWorld(){
   if(!confirm('⚠️ ワールドデータを全てリセットしますか？\nこの操作は取り消せません！')) return;
@@ -669,11 +659,9 @@ function resetWorld(){
     overrides.clear();
     invalidateAllChunks();
     updateChunks();
-    // インベントリもリセット
     for(const k in inventory) delete inventory[k];
     selectedType = GRASS;
     updateUI();
-    // プレイヤー位置をリセット
     const h = columnHeight(0,0);
     player.pos.set(0.5, h+3, 0.5);
     player.vel.set(0,0,0);
@@ -786,9 +774,8 @@ document.getElementById("jumpBtn").addEventListener("touchstart", e=>{ e.prevent
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump = true);
 
 /* =========================================================
-   ★ ブロック選択UI（ホットバー + 矢印）
+   ブロック選択UI
    ========================================================= */
-// ホットバー構築
 const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
 (function setupHotbar(){
   const bar = document.getElementById("hotbar");
@@ -806,7 +793,7 @@ const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
     
     const countSpan = document.createElement("span");
     countSpan.className = "slot-count";
-    countSpan.textContent = "0";
+    countSpan.textContent = "∞";
     slot.appendChild(countSpan);
     
     slot.addEventListener("touchstart", e=>{
@@ -822,7 +809,6 @@ const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
   });
 })();
 
-// ★ 選択中のブロックプレビュー
 const previewCanvas = document.createElement("canvas");
 previewCanvas.width = 8;
 previewCanvas.height = 8;
@@ -845,7 +831,6 @@ function selectBlock(type){
   updateSelectedPreview();
 }
 
-// ★ 矢印でブロック選択
 let blockIndex = 0;
 function prevBlock(){
   blockIndex = (blockIndex - 1 + SELECTABLE_BLOCKS.length) % SELECTABLE_BLOCKS.length;
@@ -861,31 +846,17 @@ document.getElementById("blockPrev").addEventListener("touchstart", e=>{ e.preve
 document.getElementById("blockNext").addEventListener("click", nextBlock);
 document.getElementById("blockNext").addEventListener("touchstart", e=>{ e.preventDefault(); nextBlock(); }, {passive:false});
 
-// ホットバーカウント更新
 function updateHotbarCounts(){
   document.querySelectorAll(".hotslot").forEach(slot=>{
-    const type = parseInt(slot.dataset.blockType);
-    const count = getInventoryCount(type);
-    const el = slot.querySelector(".slot-count");
-    if(el) el.textContent = count > 0 ? count : "";
+    const countEl = slot.querySelector(".slot-count");
+    if(countEl) countEl.textContent = "∞";
   });
 }
 
-// インベントリ表示更新
 function updateInventoryDisplay(){
   const container = document.getElementById("inventoryDisplay");
-  const keys = Object.keys(inventory).filter(k => inventory[k] > 0 && k != BEDROCK);
-  if(keys.length === 0){
-    container.innerHTML = '<span style="color:#888;font-size:10px;">空</span>';
-    return;
-  }
-  let html = "";
-  const sorted = keys.sort((a,b) => parseInt(a) - parseInt(b));
-  for(const k of sorted){
-    const name = BLOCK_NAMES[k] || "不明";
-    html += `<div class="inv-item"><span>${name}</span><span class="count">${inventory[k]}</span></div>`;
-  }
-  container.innerHTML = html;
+  // ★ 制限なしなので「制限なし」と表示
+  container.innerHTML = '<span style="color:#4ecdc4;font-size:10px;font-weight:700;">✨ 制限なし（∞）</span>';
 }
 
 /* =========================================================
@@ -934,7 +905,6 @@ function doPlace(){
   const hit = raycastBlock();
   if(!hit) return;
   if(selectedType === BEDROCK) return;
-  if(getInventoryCount(selectedType) <= 0) return;
   
   const nx = hit.x + Math.round(hit.normal.x);
   const ny = hit.y + Math.round(hit.normal.y);
@@ -944,7 +914,7 @@ function doPlace(){
   const block = getBlock(nx, ny, nz);
   if(block !== AIR) return;
   
-  if(!useFromInventory(selectedType)) return;
+  // ★ 制限なし：常に設置可能
   pushBlockChange(nx, ny, nz, selectedType);
 }
 
@@ -1056,7 +1026,7 @@ function animate(){
     if(player.vel.y < 0) player.onGround = true;
     player.vel.y = 0;
   }
-  if(player.pos.y < -60){
+  if(player.pos.y < -30){
     const h = columnHeight(Math.floor(player.pos.x), Math.floor(player.pos.z));
     player.pos.y = h + 3;
     player.vel.set(0,0,0);
@@ -1096,7 +1066,6 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   animate();
 });
 
-// ★ リセットボタン
 document.getElementById("resetBtn").addEventListener("click", resetWorld);
 
 })();
