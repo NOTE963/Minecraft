@@ -49,24 +49,32 @@
   #crosshair::before { left:7px; top:0; width:2px; height:16px; }
   #crosshair::after { top:7px; left:0; height:2px; width:16px; }
 
-  /* ★ トップバー（内側） */
+  /* ★ トップバー - 座標をプレイヤーリストの右横に */
   #topBar {
     position:absolute; top:12px; left:12px; right:12px;
-    display:flex; justify-content:space-between; align-items:flex-start;
+    display:flex; justify-content:space-between; align-items:center;
     font-size:10.5px; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,.7); gap:6px;
   }
-  #playerList { background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px; max-width:52vw; }
+  #topLeft {
+    display:flex; align-items:center; gap:10px;
+    background:rgba(0,0,0,.35); padding:4px 10px; border-radius:8px;
+  }
+  #playerList { font-weight:600; }
   #coords {
-    background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px;
-    white-space:nowrap; text-align:right; font-weight:700; color:#ffd700;
+    font-weight:700; color:#ffd700; font-size:11px;
+    white-space:nowrap;
+  }
+  #topRight {
+    display:flex; flex-direction:column; align-items:flex-end;
+    gap:2px;
   }
   #timeDisplay {
-    background:rgba(0,0,0,.35); padding:2px 8px; border-radius:6px;
-    font-size:9px; color:#fff; text-align:center; margin-top:2px;
+    background:rgba(0,0,0,.35); padding:2px 10px; border-radius:6px;
+    font-size:9px; color:#fff; text-align:center;
   }
-  #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:2px; text-align:right; }
+  #fpsBadge { font-size:9px; opacity:.65; color:#fff; }
 
-  /* ★ ジョイスティック（さらに内側） */
+  /* ★ ジョイスティック */
   #joyBase {
     position:absolute; left:40px; bottom:40px;
     width:100px; height:100px; border-radius:50%;
@@ -79,7 +87,7 @@
     background:rgba(255,255,255,.55); border:2px solid rgba(255,255,255,.7);
   }
 
-  /* ★ アクションボタン（さらに内側） */
+  /* ★ アクションボタン */
   #actionArea {
     position:absolute; right:40px; bottom:40px;
     display:flex; flex-direction:column; align-items:flex-end; gap:12px;
@@ -95,11 +103,17 @@
   .abtn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
   #jumpBtn { width:72px; height:72px; font-size:13px; font-weight:700; }
 
-  /* ★ インベントリ表示 */
+  /* ★ インベントリ表示 + 左右矢印 */
+  #inventoryArea {
+    position:absolute; bottom:130px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:12px;
+    pointer-events:auto;
+  }
   #inventoryDisplay {
-    position:absolute; bottom:120px; left:50%; transform:translateX(-50%);
     background:rgba(0,0,0,.5); padding:6px 14px; border-radius:10px;
-    display:flex; gap:10px; pointer-events:none; font-size:11px; color:#fff;
+    display:flex; gap:10px; font-size:11px; color:#fff;
+    min-width:120px; justify-content:center;
+    pointer-events:none;
   }
   .inv-item {
     display:flex; align-items:center; gap:4px;
@@ -107,7 +121,27 @@
   }
   .inv-item .count { font-weight:700; color:#ffd700; min-width:20px; text-align:center; }
 
-  /* ★ ホットバー（クリック選択可） */
+  /* ★ 左右矢印ボタン */
+  .arrow-btn {
+    width:44px; height:44px; border-radius:50%;
+    background:rgba(20,20,20,.5); border:2px solid rgba(255,255,255,.5);
+    color:#fff; font-size:22px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; pointer-events:auto;
+  }
+  .arrow-btn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
+  #arrowLeft { }
+  #arrowRight { }
+
+  /* ★ 選択中ブロック表示 */
+  #selectedBlockDisplay {
+    background:rgba(0,0,0,.5); padding:4px 12px; border-radius:8px;
+    font-size:11px; color:#fff; text-align:center;
+    pointer-events:none;
+    min-width:60px;
+  }
+  #selectedBlockDisplay .block-name { font-weight:700; color:#ffd700; }
+
+  /* ★ ホットバー */
   #hotbar {
     position:absolute; top:12px; left:50%; transform:translateX(-50%);
     display:flex; gap:4px; background:rgba(0,0,0,.4); padding:5px 8px;
@@ -125,12 +159,6 @@
   .hotslot .slot-count {
     position:absolute; bottom:0; right:2px;
     font-size:9px; font-weight:700; color:#ffd700;
-    text-shadow:0 0 3px rgba(0,0,0,.8);
-    pointer-events:none;
-  }
-  .hotslot .slot-label {
-    position:absolute; top:0; left:2px;
-    font-size:7px; font-weight:700; color:rgba(255,255,255,.6);
     text-shadow:0 0 3px rgba(0,0,0,.8);
     pointer-events:none;
   }
@@ -153,12 +181,14 @@
 
   <div id="hud">
     <div id="crosshair"></div>
+
+    <!-- ★ トップバー - 座標をプレイヤーリストの右横に -->
     <div id="topBar">
-      <div>
-        <div id="playerList">👥 読込中...</div>
+      <div id="topLeft">
+        <span id="playerList">👥 読込中...</span>
+        <span id="coords">X:0 Y:0 Z:0</span>
       </div>
-      <div>
-        <div id="coords">X:0 Y:0 Z:0</div>
+      <div id="topRight">
         <div id="timeDisplay">☀️ 昼</div>
         <div id="fpsBadge"></div>
       </div>
@@ -166,7 +196,15 @@
 
     <div id="hotbar"></div>
 
-    <div id="inventoryDisplay"></div>
+    <!-- ★ インベントリ + 左右矢印 -->
+    <div id="inventoryArea">
+      <div class="arrow-btn" id="arrowLeft">◀</div>
+      <div id="inventoryDisplay"></div>
+      <div id="selectedBlockDisplay">
+        選択: <span class="block-name" id="selectedBlockName">草</span>
+      </div>
+      <div class="arrow-btn" id="arrowRight">▶</div>
+    </div>
 
     <div id="lookLayer"></div>
     <div id="joyBase"><div id="joyStick"></div></div>
@@ -332,7 +370,7 @@ function terrainBlockAt(x,y,z){
 }
 
 /* =========================================================
-   インベントリ（所持ブロック管理）
+   インベントリ
    ========================================================= */
 const inventory = {};
 const BLOCK_NAMES = {
@@ -340,12 +378,18 @@ const BLOCK_NAMES = {
   [WOOD]: "木材", [LEAVES]: "葉", [SAND]: "砂"
 };
 
+// ★ 選択中のブロック（ホットバーと連動）
+let selectedType = GRASS;
+const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
+let selectedIndex = 0;
+
 function addToInventory(type, count){
   if(type === AIR) return;
   if(!inventory[type]) inventory[type] = 0;
   inventory[type] += count;
   updateInventoryDisplay();
   updateHotbarCounts();
+  updateSelectedBlockDisplay();
 }
 
 function getInventoryCount(type){
@@ -357,6 +401,7 @@ function useFromInventory(type){
   inventory[type]--;
   updateInventoryDisplay();
   updateHotbarCounts();
+  updateSelectedBlockDisplay();
   return true;
 }
 
@@ -364,7 +409,7 @@ function updateInventoryDisplay(){
   const container = document.getElementById("inventoryDisplay");
   const keys = Object.keys(inventory).filter(k => inventory[k] > 0);
   if(keys.length === 0){
-    container.innerHTML = '<span style="color:#888;font-size:10px;">インベントリ空</span>';
+    container.innerHTML = '<span style="color:#888;font-size:10px;">空</span>';
     return;
   }
   let html = "";
@@ -377,6 +422,52 @@ function updateInventoryDisplay(){
     </div>`;
   }
   container.innerHTML = html;
+}
+
+function updateSelectedBlockDisplay(){
+  const name = BLOCK_NAMES[selectedType] || "不明";
+  document.getElementById("selectedBlockName").textContent = name;
+  // ホットバーの選択も更新
+  document.querySelectorAll(".hotslot").forEach((slot, i)=>{
+    slot.classList.toggle("selected", i === selectedIndex);
+  });
+}
+
+// ★ 左右矢印でブロック選択
+function selectPrevBlock(){
+  let idx = selectedIndex - 1;
+  if(idx < 0) idx = HOTBAR_BLOCKS.length - 1;
+  selectedIndex = idx;
+  selectedType = HOTBAR_BLOCKS[idx];
+  updateSelectedBlockDisplay();
+}
+
+function selectNextBlock(){
+  let idx = selectedIndex + 1;
+  if(idx >= HOTBAR_BLOCKS.length) idx = 0;
+  selectedIndex = idx;
+  selectedType = HOTBAR_BLOCKS[idx];
+  updateSelectedBlockDisplay();
+}
+
+// ホットバーのカウント更新
+function updateHotbarCounts(){
+  const slots = document.querySelectorAll(".hotslot");
+  slots.forEach((slot, i)=>{
+    const type = HOTBAR_BLOCKS[i];
+    const count = getInventoryCount(type);
+    const countEl = slot.querySelector(".slot-count");
+    if(countEl) countEl.textContent = count > 0 ? count : "";
+  });
+}
+
+// ホットバーのスロットをクリックで選択
+function selectSlot(slot, index){
+  document.querySelectorAll(".hotslot").forEach(s => s.classList.remove("selected"));
+  slot.classList.add("selected");
+  selectedIndex = index;
+  selectedType = HOTBAR_BLOCKS[index];
+  updateSelectedBlockDisplay();
 }
 
 /* =========================================================
@@ -405,7 +496,6 @@ scene.fog = new THREE.Fog(0x8fc7f0, 20, 62);
 const camera = new THREE.PerspectiveCamera(70, 16/9, 0.05, 90);
 camera.rotation.order = "YXZ";
 
-// 昼夜サイクル用の光
 const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a3f, 0.9);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff3d0, 0.85);
@@ -414,7 +504,7 @@ scene.add(sun);
 const ambient = new THREE.AmbientLight(0x404060, 0.3);
 scene.add(ambient);
 
-let timeOfDay = 0; // 0-1 (0=夜, 0.5=昼)
+let timeOfDay = 0;
 
 function updateDayNight(dt){
   timeOfDay += dt * 0.008;
@@ -725,19 +815,14 @@ const input = { moveX:0, moveY:0, jump:false };
 document.getElementById("jumpBtn").addEventListener("touchstart", e=>{ e.preventDefault(); input.jump = true; }, {passive:false});
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump = true);
 
-// ★ 選択中のブロック
-let selectedType = GRASS;
-
-// ★ ホットバー構築（クリック選択可）
-const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
+// ★ ホットバー構築
 (function setupHotbar(){
   const bar = document.getElementById("hotbar");
   HOTBAR_BLOCKS.forEach((t,i)=>{
     const slot = document.createElement("div");
     slot.className = "hotslot" + (i===0 ? " selected":"");
-    slot.dataset.blockType = t;
+    slot.dataset.index = i;
     
-    // テクスチャ表示
     const c = document.createElement("canvas"); c.width=16; c.height=16;
     const ctx = c.getContext("2d");
     const def = BLOCK_DEFS[t];
@@ -745,50 +830,29 @@ const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
     if(m && m.map) ctx.drawImage(m.map.image, 0,0);
     slot.appendChild(c);
     
-    // カウント表示
     const countSpan = document.createElement("span");
     countSpan.className = "slot-count";
     countSpan.textContent = "0";
     slot.appendChild(countSpan);
     
-    // ラベル（ブロック名の頭文字）
-    const label = document.createElement("span");
-    label.className = "slot-label";
-    label.textContent = BLOCK_NAMES[t]?.charAt(0) || "?";
-    slot.appendChild(label);
-    
-    // ★ クリック/タップで選択
     slot.addEventListener("touchstart", e=>{
       e.preventDefault();
-      selectSlot(slot);
+      selectSlot(slot, i);
     }, {passive:false});
     slot.addEventListener("mousedown", (e)=>{
       e.preventDefault();
-      selectSlot(slot);
+      selectSlot(slot, i);
     });
     
     bar.appendChild(slot);
   });
 })();
 
-function selectSlot(slot){
-  // 全スロットの選択解除
-  document.querySelectorAll(".hotslot").forEach(s => s.classList.remove("selected"));
-  slot.classList.add("selected");
-  selectedType = parseInt(slot.dataset.blockType);
-  updateHotbarCounts();
-}
-
-// ホットバーのカウント更新
-function updateHotbarCounts(){
-  const slots = document.querySelectorAll(".hotslot");
-  slots.forEach((slot)=>{
-    const type = parseInt(slot.dataset.blockType);
-    const count = getInventoryCount(type);
-    const countEl = slot.querySelector(".slot-count");
-    if(countEl) countEl.textContent = count > 0 ? count : "";
-  });
-}
+// ★ 左右矢印イベント
+document.getElementById("arrowLeft").addEventListener("click", selectPrevBlock);
+document.getElementById("arrowLeft").addEventListener("touchstart", e=>{ e.preventDefault(); selectPrevBlock(); }, {passive:false});
+document.getElementById("arrowRight").addEventListener("click", selectNextBlock);
+document.getElementById("arrowRight").addEventListener("touchstart", e=>{ e.preventDefault(); selectNextBlock(); }, {passive:false});
 
 const raycaster = new THREE.Raycaster();
 raycaster.far = 7;
@@ -991,6 +1055,7 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   updateChunks();
   updateInventoryDisplay();
   updateHotbarCounts();
+  updateSelectedBlockDisplay();
   animate();
 });
 
