@@ -49,8 +49,9 @@
   #crosshair::before { left:7px; top:0; width:2px; height:16px; }
   #crosshair::after { top:7px; left:0; height:2px; width:16px; }
 
+  /* ★ トップバー（内側） */
   #topBar {
-    position:absolute; top:6px; left:6px; right:6px;
+    position:absolute; top:12px; left:12px; right:12px;
     display:flex; justify-content:space-between; align-items:flex-start;
     font-size:10.5px; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,.7); gap:6px;
   }
@@ -65,8 +66,9 @@
   }
   #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:2px; text-align:right; }
 
+  /* ★ ジョイスティック（さらに内側） */
   #joyBase {
-    position:absolute; left:28px; bottom:28px;
+    position:absolute; left:40px; bottom:40px;
     width:100px; height:100px; border-radius:50%;
     background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.4);
     pointer-events:auto;
@@ -77,59 +79,60 @@
     background:rgba(255,255,255,.55); border:2px solid rgba(255,255,255,.7);
   }
 
+  /* ★ アクションボタン（さらに内側） */
   #actionArea {
-    position:absolute; right:28px; bottom:28px;
-    display:flex; flex-direction:column; align-items:flex-end; gap:10px;
+    position:absolute; right:40px; bottom:40px;
+    display:flex; flex-direction:column; align-items:flex-end; gap:12px;
     pointer-events:auto;
   }
-  .actionRow { display:flex; gap:12px; }
+  .actionRow { display:flex; gap:14px; }
   .abtn {
-    width:60px; height:60px; border-radius:50%;
+    width:64px; height:64px; border-radius:50%;
     background:rgba(20,20,20,.5); border:2px solid rgba(255,255,255,.6);
     display:flex; align-items:center; justify-content:center;
-    font-size:24px; color:#fff;
+    font-size:26px; color:#fff;
   }
   .abtn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
-  #jumpBtn { width:68px; height:68px; font-size:12px; font-weight:700; }
+  #jumpBtn { width:72px; height:72px; font-size:13px; font-weight:700; }
 
-  /* ★ インベントリ表示（タップ切り替え可能） */
+  /* ★ インベントリ表示 */
   #inventoryDisplay {
-    position:absolute; bottom:105px; left:50%; transform:translateX(-50%);
-    background:rgba(0,0,0,.6); padding:6px 12px; border-radius:10px;
-    display:flex; gap:6px; pointer-events:auto; flex-wrap:wrap; justify-content:center;
-    max-width:80vw; max-height:60px; overflow-y:auto;
+    position:absolute; bottom:120px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,.5); padding:6px 14px; border-radius:10px;
+    display:flex; gap:10px; pointer-events:none; font-size:11px; color:#fff;
   }
   .inv-item {
-    display:flex; align-items:center; gap:3px;
-    background:rgba(255,255,255,.08); padding:2px 8px; border-radius:6px;
-    cursor:pointer; pointer-events:auto;
-    transition:0.15s; border:2px solid transparent;
+    display:flex; align-items:center; gap:4px;
+    background:rgba(255,255,255,.1); padding:2px 8px; border-radius:6px;
   }
-  .inv-item:active { transform:scale(0.92); }
-  .inv-item.selected {
-    border-color:#ffd700; background:rgba(255,215,0,.15);
-  }
-  .inv-item .icon { width:16px; height:16px; image-rendering:pixelated; }
-  .inv-item .count { font-weight:700; color:#ffd700; min-width:16px; text-align:center; font-size:11px; }
-  .inv-item .name { color:#fff; font-size:10px; }
+  .inv-item .count { font-weight:700; color:#ffd700; min-width:20px; text-align:center; }
 
+  /* ★ ホットバー（クリック選択可） */
   #hotbar {
-    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
     display:flex; gap:4px; background:rgba(0,0,0,.4); padding:5px 8px;
     border-radius:10px; pointer-events:auto;
     max-width:75vw;
   }
   .hotslot {
-    width:38px; height:38px; flex:0 0 auto; border-radius:6px;
+    width:40px; height:40px; flex:0 0 auto; border-radius:6px;
     border:2px solid rgba(255,255,255,.4);
     background:#555; overflow:hidden; position:relative;
+    cursor:pointer;
   }
   .hotslot.selected { border-color:#fff; box-shadow:0 0 8px rgba(255,255,255,.9); }
   .hotslot canvas { width:100%; height:100%; image-rendering:pixelated; }
   .hotslot .slot-count {
     position:absolute; bottom:0; right:2px;
-    font-size:8px; font-weight:700; color:#ffd700;
+    font-size:9px; font-weight:700; color:#ffd700;
     text-shadow:0 0 3px rgba(0,0,0,.8);
+    pointer-events:none;
+  }
+  .hotslot .slot-label {
+    position:absolute; top:0; left:2px;
+    font-size:7px; font-weight:700; color:rgba(255,255,255,.6);
+    text-shadow:0 0 3px rgba(0,0,0,.8);
+    pointer-events:none;
   }
 
   #lookLayer { position:absolute; inset:0; pointer-events:auto; }
@@ -334,19 +337,8 @@ function terrainBlockAt(x,y,z){
 const inventory = {};
 const BLOCK_NAMES = {
   [GRASS]: "草", [DIRT]: "土", [STONE]: "石",
-  [WOOD]: "木", [LEAVES]: "葉", [SAND]: "砂"
+  [WOOD]: "木材", [LEAVES]: "葉", [SAND]: "砂"
 };
-const BLOCK_ICONS = {
-  [GRASS]: "#6ab04c",
-  [DIRT]: "#8a5a34",
-  [STONE]: "#8d8d8d",
-  [WOOD]: "#6e4a28",
-  [LEAVES]: "#3f8f3a",
-  [SAND]: "#ddd08a"
-};
-const BLOCK_TYPES = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
-
-let selectedBlock = GRASS;
 
 function addToInventory(type, count){
   if(type === AIR) return;
@@ -368,66 +360,23 @@ function useFromInventory(type){
   return true;
 }
 
-function selectBlock(type){
-  if(getInventoryCount(type) <= 0) return;
-  selectedBlock = type;
-  updateInventoryDisplay();
-  updateHotbarSelection();
-}
-
 function updateInventoryDisplay(){
   const container = document.getElementById("inventoryDisplay");
-  const keys = BLOCK_TYPES.filter(k => inventory[k] > 0);
+  const keys = Object.keys(inventory).filter(k => inventory[k] > 0);
   if(keys.length === 0){
     container.innerHTML = '<span style="color:#888;font-size:10px;">インベントリ空</span>';
     return;
   }
   let html = "";
-  for(const k of keys){
+  const sorted = keys.sort((a,b) => parseInt(a) - parseInt(b));
+  for(const k of sorted){
     const name = BLOCK_NAMES[k] || "不明";
-    const selected = (k === selectedBlock) ? " selected" : "";
-    html += `<div class="inv-item${selected}" data-type="${k}">
-      <span style="display:inline-block;width:14px;height:14px;background:${BLOCK_ICONS[k]};border-radius:2px;"></span>
+    html += `<div class="inv-item">
+      <span style="font-size:12px;">${name}</span>
       <span class="count">${inventory[k]}</span>
-      <span class="name">${name}</span>
     </div>`;
   }
   container.innerHTML = html;
-  
-  // クリックイベントを設定
-  container.querySelectorAll(".inv-item").forEach(el => {
-    el.addEventListener("click", (e) => {
-      const type = parseInt(el.dataset.type);
-      if(getInventoryCount(type) > 0) {
-        selectBlock(type);
-      }
-    });
-    el.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      const type = parseInt(el.dataset.type);
-      if(getInventoryCount(type) > 0) {
-        selectBlock(type);
-      }
-    }, {passive:false});
-  });
-}
-
-function updateHotbarSelection(){
-  const slots = document.querySelectorAll(".hotslot");
-  slots.forEach((slot, i) => {
-    const type = HOTBAR_BLOCKS[i];
-    slot.classList.toggle("selected", type === selectedBlock);
-  });
-}
-
-function updateHotbarCounts(){
-  const slots = document.querySelectorAll(".hotslot");
-  slots.forEach((slot, i) => {
-    const type = HOTBAR_BLOCKS[i];
-    const count = getInventoryCount(type);
-    const countEl = slot.querySelector(".slot-count");
-    if(countEl) countEl.textContent = count > 0 ? count : "";
-  });
 }
 
 /* =========================================================
@@ -465,7 +414,7 @@ scene.add(sun);
 const ambient = new THREE.AmbientLight(0x404060, 0.3);
 scene.add(ambient);
 
-let timeOfDay = 0;
+let timeOfDay = 0; // 0-1 (0=夜, 0.5=昼)
 
 function updateDayNight(dt){
   timeOfDay += dt * 0.008;
@@ -776,12 +725,19 @@ const input = { moveX:0, moveY:0, jump:false };
 document.getElementById("jumpBtn").addEventListener("touchstart", e=>{ e.preventDefault(); input.jump = true; }, {passive:false});
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump = true);
 
+// ★ 選択中のブロック
+let selectedType = GRASS;
+
+// ★ ホットバー構築（クリック選択可）
 const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
 (function setupHotbar(){
   const bar = document.getElementById("hotbar");
   HOTBAR_BLOCKS.forEach((t,i)=>{
     const slot = document.createElement("div");
-    slot.className = "hotslot" + (t === selectedBlock ? " selected":"");
+    slot.className = "hotslot" + (i===0 ? " selected":"");
+    slot.dataset.blockType = t;
+    
+    // テクスチャ表示
     const c = document.createElement("canvas"); c.width=16; c.height=16;
     const ctx = c.getContext("2d");
     const def = BLOCK_DEFS[t];
@@ -789,23 +745,50 @@ const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
     if(m && m.map) ctx.drawImage(m.map.image, 0,0);
     slot.appendChild(c);
     
+    // カウント表示
     const countSpan = document.createElement("span");
     countSpan.className = "slot-count";
     countSpan.textContent = "0";
     slot.appendChild(countSpan);
     
-    slot.addEventListener("touchstart", e=>{ e.preventDefault(); select(); }, {passive:false});
-    slot.addEventListener("mousedown", select);
-    function select(){
-      if(getInventoryCount(t) <= 0) return;
-      selectedBlock = t;
-      Array.from(bar.children).forEach(ch=>ch.classList.remove("selected"));
-      slot.classList.add("selected");
-      updateInventoryDisplay();
-    }
+    // ラベル（ブロック名の頭文字）
+    const label = document.createElement("span");
+    label.className = "slot-label";
+    label.textContent = BLOCK_NAMES[t]?.charAt(0) || "?";
+    slot.appendChild(label);
+    
+    // ★ クリック/タップで選択
+    slot.addEventListener("touchstart", e=>{
+      e.preventDefault();
+      selectSlot(slot);
+    }, {passive:false});
+    slot.addEventListener("mousedown", (e)=>{
+      e.preventDefault();
+      selectSlot(slot);
+    });
+    
     bar.appendChild(slot);
   });
 })();
+
+function selectSlot(slot){
+  // 全スロットの選択解除
+  document.querySelectorAll(".hotslot").forEach(s => s.classList.remove("selected"));
+  slot.classList.add("selected");
+  selectedType = parseInt(slot.dataset.blockType);
+  updateHotbarCounts();
+}
+
+// ホットバーのカウント更新
+function updateHotbarCounts(){
+  const slots = document.querySelectorAll(".hotslot");
+  slots.forEach((slot)=>{
+    const type = parseInt(slot.dataset.blockType);
+    const count = getInventoryCount(type);
+    const countEl = slot.querySelector(".slot-count");
+    if(countEl) countEl.textContent = count > 0 ? count : "";
+  });
+}
 
 const raycaster = new THREE.Raycaster();
 raycaster.far = 7;
@@ -851,7 +834,7 @@ function doPlace(){
   const hit = raycastBlock();
   if(!hit) return;
   
-  if(getInventoryCount(selectedBlock) <= 0) return;
+  if(getInventoryCount(selectedType) <= 0) return;
   
   const nx = hit.x + Math.round(hit.normal.x);
   const ny = hit.y + Math.round(hit.normal.y);
@@ -861,9 +844,8 @@ function doPlace(){
   const block = getBlock(nx, ny, nz);
   if(block !== AIR) return;
   
-  if(!useFromInventory(selectedBlock)) return;
-  
-  pushBlockChange(nx, ny, nz, selectedBlock);
+  if(!useFromInventory(selectedType)) return;
+  pushBlockChange(nx, ny, nz, selectedType);
 }
 
 /* =========================================================
