@@ -62,7 +62,23 @@
   #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:2px; text-align:right; }
   #timeBadge { font-size:9px; opacity:.8; color:#fff; margin-top:1px; text-align:right; }
 
-  /* ★ ボタン位置をさらに内側に */
+  #resetWorldBtn {
+    background:rgba(220,53,69,0.7);
+    border:1px solid rgba(255,255,255,0.5);
+    color:#fff;
+    padding:2px 10px;
+    border-radius:4px;
+    font-size:9px;
+    cursor:pointer;
+    pointer-events:auto;
+    font-weight:700;
+    margin-top:2px;
+    transition:0.2s;
+  }
+  #resetWorldBtn:hover { background:rgba(220,53,69,0.9); }
+  #resetWorldBtn:active { transform:scale(0.95); }
+  #resetWorldBtn:disabled { opacity:0.5; cursor:not-allowed; }
+
   #joyBase {
     position:absolute; left:28px; bottom:28px;
     width:100px; height:100px; border-radius:50%;
@@ -126,10 +142,11 @@
       <div>
         <div id="playerList">👥 読込中...</div>
       </div>
-      <div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
         <div id="coords">X:0 Y:0 Z:0</div>
         <div id="timeBadge">☀️ 昼</div>
         <div id="fpsBadge"></div>
+        <button id="resetWorldBtn">🌍 ワールドリセット</button>
       </div>
     </div>
 
@@ -230,7 +247,7 @@ function fbm(x,z,seed,octaves){
 }
 
 /* =========================================================
-   地形・バイオーム定義（水・マグマ・海を削除）
+   地形・バイオーム定義
    ========================================================= */
 const AIR=0, GRASS=1, DIRT=2, STONE=3, WOOD=4, LEAVES=5, SAND=6, BEDROCK=7;
 const COBBLESTONE=8, PLANKS=9;
@@ -342,7 +359,6 @@ const sun = new THREE.DirectionalLight(0xfff3d0, 0.85);
 sun.position.set(15, 25, 10);
 scene.add(sun);
 
-/* ★ 昼夜サイクル用のライト */
 const ambientLight = new THREE.AmbientLight(0x404060, 0.3);
 scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffeedd, 1.0);
@@ -438,7 +454,7 @@ const dummy = new THREE.Object3D();
    ========================================================= */
 const CHUNK_SIZE = 12;
 const RENDER_DIST = 2;
-const RENDER_DEPTH = 40; // 地下深くまで表示
+const RENDER_DEPTH = 40;
 const chunks = new Map();
 
 function createChunkMeshSet(){
@@ -489,7 +505,7 @@ function buildChunk(cx,cz){
   overrides.forEach((type,k)=>{
     const parts = k.split(",").map(Number);
     const x=parts[0], y=parts[1], z=parts[2];
-    if(y < -30) return; // 岩盤はオーバーライド不可
+    if(y < -30) return;
     if(x<startX || x>=startX+CHUNK_SIZE || z<startZ || z>=startZ+CHUNK_SIZE) return;
     if(type!==AIR) place(x,y,z,type);
   });
@@ -528,6 +544,61 @@ function invalidateAllChunks(){
 }
 
 /* =========================================================
+   ★ ワールドリセット処理 ★
+   ========================================================= */
+document.getElementById('resetWorldBtn').addEventListener('click', async function() {
+  if (!confirm('⚠️ 本当にワールドをリセットしますか？\n\n全てのブロックデータが消去され、元の地形に戻ります。')) {
+    return;
+  }
+  
+  if (!confirm('🔥 最終確認：ワールドをリセットしますか？\nこの操作は取り消せません！')) {
+    return;
+  }
+
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = '⏳ リセット中...';
+  btn.style.opacity = '0.5';
+
+  try {
+    // Firebaseのブロックデータを全て削除
+    const snapshot = await db.ref(ROOM + '/blocks').once('value');
+    const data = snapshot.val();
+    
+    if (data) {
+      const updates = {};
+      Object.keys(data).forEach(key => {
+        updates[key] = null;
+      });
+      await db.ref(ROOM + '/blocks').update(updates);
+      console.log('✅ ワールドリセット完了');
+    }
+
+    // ローカルのオーバーライドをクリア
+    overrides.clear();
+    
+    // チャンクを再構築
+    invalidateAllChunks();
+    updateChunks();
+
+    // プレイヤーを安全な位置に移動
+    const resetY = columnHeight(Math.floor(player.pos.x), Math.floor(player.pos.z)) + 3;
+    player.pos.y = resetY;
+    player.vel.set(0,0,0);
+
+    alert('✅ ワールドがリセットされました！');
+
+  } catch (error) {
+    console.error('❌ リセットエラー:', error);
+    alert('❌ リセットに失敗しました: ' + error.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🌍 ワールドリセット';
+  btn.style.opacity = '1';
+});
+
+/* =========================================================
    Firebase差分同期
    ========================================================= */
 db.ref(ROOM + "/blocks").on("value", snap=>{
@@ -535,7 +606,7 @@ db.ref(ROOM + "/blocks").on("value", snap=>{
   overrides.clear();
   Object.keys(val).forEach(k=>{
     const parts = k.split("_").map(Number);
-    if(parts[1] < -30) return; // 岩盤は同期しない
+    if(parts[1] < -30) return;
     overrides.set(parts.join(","), val[k]);
   });
   invalidateAllChunks();
@@ -543,7 +614,7 @@ db.ref(ROOM + "/blocks").on("value", snap=>{
 });
 
 function pushBlockChange(x,y,z,type){
-  if(y < -30) return; // 岩盤は変更不可
+  if(y < -30) return;
   overrides.set(key(x,y,z), type);
   invalidateAllChunks();
   updateChunks();
@@ -712,7 +783,7 @@ function doBreak(){
   const hit = raycastBlock();
   if(!hit) return;
   const block = getBlock(hit.x, hit.y, hit.z);
-  if(block === BEDROCK) return; // 岩盤は壊せない
+  if(block === BEDROCK) return;
   if(block === LEAVES) return;
   pushBlockChange(hit.x, hit.y, hit.z, AIR);
 }
@@ -722,7 +793,7 @@ function doPlace(){
   const nx = hit.x + Math.round(hit.normal.x);
   const ny = hit.y + Math.round(hit.normal.y);
   const nz = hit.z + Math.round(hit.normal.z);
-  if(ny < -30) return; // 岩盤の位置には置けない
+  if(ny < -30) return;
   const dx = Math.abs(nx+0.5-player.pos.x), dy = Math.abs(ny+0.5-player.pos.y-0.8), dz = Math.abs(nz+0.5-player.pos.z);
   if(dx<0.6 && dy<1.2 && dz<0.6) return;
   const block = getBlock(nx, ny, nz);
@@ -796,16 +867,15 @@ playersRef.on("value", snap=>{
 });
 
 /* =========================================================
-   ★ 昼夜サイクル
+   昼夜サイクル
    ========================================================= */
-const DAY_LENGTH = 120; // 120秒で1日
-let timeOfDay = 0; // 0〜1 (0=夜明け, 0.25=昼, 0.5=夕方, 0.75=夜)
+const DAY_LENGTH = 120;
+let timeOfDay = 0;
 
 function updateDayNightCycle(dt){
   timeOfDay += dt / DAY_LENGTH;
   if(timeOfDay > 1) timeOfDay -= 1;
   
-  // 太陽の角度（ラジアン）
   const angle = timeOfDay * Math.PI * 2;
   const sunHeight = Math.sin(angle);
   const sunX = Math.cos(angle) * 40;
@@ -814,12 +884,10 @@ function updateDayNightCycle(dt){
   
   dirLight.position.set(sunX, sunY, sunZ);
   
-  // 明るさ調整
   const brightness = Math.max(0.1, Math.min(1, (sunHeight + 0.5) * 1.2));
   dirLight.intensity = brightness * 1.2;
   ambientLight.intensity = 0.15 + brightness * 0.25;
   
-  // 空の色
   const skyBright = Math.max(0.1, Math.min(1, (sunHeight + 0.3) * 1.1));
   const r = 0.55 + skyBright * 0.45;
   const g = 0.78 + skyBright * 0.22;
@@ -827,7 +895,6 @@ function updateDayNightCycle(dt){
   scene.background.setRGB(r, g, b);
   scene.fog.color.setRGB(r * 0.7, g * 0.7, b * 0.7);
   
-  // HUD表示
   const timeBadge = document.getElementById("timeBadge");
   if(timeOfDay < 0.2 || timeOfDay > 0.8) timeBadge.textContent = "🌅 夜明け";
   else if(timeOfDay < 0.4) timeBadge.textContent = "☀️ 昼";
@@ -848,7 +915,6 @@ function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
 
-  // 昼夜サイクル更新
   updateDayNightCycle(dt);
 
   camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
