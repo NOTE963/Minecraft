@@ -49,7 +49,7 @@
   #crosshair::before { left:7px; top:0; width:2px; height:16px; }
   #crosshair::after { top:7px; left:0; height:2px; width:16px; }
 
-  /* ★ トップバー - 座標をプレイヤーリストの右横に */
+  /* ★ トップバー（座標を右横に） */
   #topBar {
     position:absolute; top:12px; left:12px; right:12px;
     display:flex; justify-content:space-between; align-items:center;
@@ -57,22 +57,20 @@
   }
   #topLeft {
     display:flex; align-items:center; gap:10px;
-    background:rgba(0,0,0,.35); padding:4px 10px; border-radius:8px;
   }
-  #playerList { font-weight:600; }
+  #playerList { background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px; max-width:40vw; }
   #coords {
-    font-weight:700; color:#ffd700; font-size:11px;
-    white-space:nowrap;
+    background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px;
+    white-space:nowrap; font-weight:700; color:#ffd700; font-size:10px;
   }
   #topRight {
     display:flex; flex-direction:column; align-items:flex-end;
-    gap:2px;
   }
   #timeDisplay {
-    background:rgba(0,0,0,.35); padding:2px 10px; border-radius:6px;
+    background:rgba(0,0,0,.35); padding:2px 8px; border-radius:6px;
     font-size:9px; color:#fff; text-align:center;
   }
-  #fpsBadge { font-size:9px; opacity:.65; color:#fff; }
+  #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:1px; text-align:right; }
 
   /* ★ ジョイスティック */
   #joyBase {
@@ -103,9 +101,9 @@
   .abtn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
   #jumpBtn { width:72px; height:72px; font-size:13px; font-weight:700; }
 
-  /* ★ インベントリ表示 + 左右矢印 */
+  /* ★ インベントリ表示 + 矢印ブロック選択 */
   #inventoryArea {
-    position:absolute; bottom:130px; left:50%; transform:translateX(-50%);
+    position:absolute; bottom:120px; left:50%; transform:translateX(-50%);
     display:flex; align-items:center; gap:12px;
     pointer-events:auto;
   }
@@ -113,7 +111,6 @@
     background:rgba(0,0,0,.5); padding:6px 14px; border-radius:10px;
     display:flex; gap:10px; font-size:11px; color:#fff;
     min-width:120px; justify-content:center;
-    pointer-events:none;
   }
   .inv-item {
     display:flex; align-items:center; gap:4px;
@@ -121,25 +118,13 @@
   }
   .inv-item .count { font-weight:700; color:#ffd700; min-width:20px; text-align:center; }
 
-  /* ★ 左右矢印ボタン */
   .arrow-btn {
-    width:44px; height:44px; border-radius:50%;
-    background:rgba(20,20,20,.5); border:2px solid rgba(255,255,255,.5);
-    color:#fff; font-size:22px; display:flex; align-items:center; justify-content:center;
+    width:40px; height:40px; border-radius:50%;
+    background:rgba(0,0,0,.5); border:2px solid rgba(255,255,255,.5);
+    color:#fff; font-size:20px; display:flex; align-items:center; justify-content:center;
     cursor:pointer; pointer-events:auto;
   }
-  .arrow-btn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
-  #arrowLeft { }
-  #arrowRight { }
-
-  /* ★ 選択中ブロック表示 */
-  #selectedBlockDisplay {
-    background:rgba(0,0,0,.5); padding:4px 12px; border-radius:8px;
-    font-size:11px; color:#fff; text-align:center;
-    pointer-events:none;
-    min-width:60px;
-  }
-  #selectedBlockDisplay .block-name { font-weight:700; color:#ffd700; }
+  .arrow-btn:active { background:rgba(0,0,0,.8); transform:scale(0.92); }
 
   /* ★ ホットバー */
   #hotbar {
@@ -162,6 +147,12 @@
     text-shadow:0 0 3px rgba(0,0,0,.8);
     pointer-events:none;
   }
+  .hotslot .slot-label {
+    position:absolute; top:0; left:2px;
+    font-size:7px; font-weight:700; color:rgba(255,255,255,.6);
+    text-shadow:0 0 3px rgba(0,0,0,.8);
+    pointer-events:none;
+  }
 
   #lookLayer { position:absolute; inset:0; pointer-events:auto; }
 </style>
@@ -172,7 +163,7 @@
 
   <div id="startScreen">
     <h1>⛏ Mini Craft Online</h1>
-    <p>チャンク式無限ワールド。ブロックを掘って集め、建築しよう！</p>
+    <p>チャンク式無限ワールド。地下深くまで掘り下げよう！</p>
     <input id="nameInput" maxlength="10" placeholder="ニックネーム" value="Craft">
     <button id="startBtn">ワールドに入る</button>
     <div id="startStatus">Firebase接続待機中...</div>
@@ -181,12 +172,12 @@
 
   <div id="hud">
     <div id="crosshair"></div>
-
-    <!-- ★ トップバー - 座標をプレイヤーリストの右横に -->
+    
+    <!-- ★ トップバー（座標をプレイヤーリストの右横に） -->
     <div id="topBar">
       <div id="topLeft">
-        <span id="playerList">👥 読込中...</span>
-        <span id="coords">X:0 Y:0 Z:0</span>
+        <div id="playerList">👥 読込中...</div>
+        <div id="coords">X:0 Y:0 Z:0</div>
       </div>
       <div id="topRight">
         <div id="timeDisplay">☀️ 昼</div>
@@ -196,12 +187,11 @@
 
     <div id="hotbar"></div>
 
-    <!-- ★ インベントリ + 左右矢印 -->
+    <!-- ★ インベントリ + 矢印選択 -->
     <div id="inventoryArea">
       <div class="arrow-btn" id="arrowLeft">◀</div>
-      <div id="inventoryDisplay"></div>
-      <div id="selectedBlockDisplay">
-        選択: <span class="block-name" id="selectedBlockName">草</span>
+      <div id="inventoryDisplay">
+        <span style="color:#888;font-size:10px;">インベントリ空</span>
       </div>
       <div class="arrow-btn" id="arrowRight">▶</div>
     </div>
@@ -301,9 +291,9 @@ function fbm(x,z,seed,octaves){
 }
 
 /* =========================================================
-   地形・バイオーム定義
+   地形・バイオーム定義（地下深く + 岩盤）
    ========================================================= */
-const AIR=0, GRASS=1, DIRT=2, STONE=3, WOOD=4, LEAVES=5, SAND=6;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, WOOD=4, LEAVES=5, SAND=6, BEDROCK=7;
 
 const BIOME_DESERT=0, BIOME_PLAINS=1, BIOME_FOREST=2, BIOME_MOUNTAIN=3;
 
@@ -349,6 +339,9 @@ function terrainBlockAt(x,y,z){
   const biome = columnBiome(x,z);
   const h = columnHeight(x,z);
   
+  // ★ 岩盤（最下部、壊せない）
+  if(y <= -45) return BEDROCK;
+  
   if(y >= h){
     for(let dx=-1;dx<=1;dx++) for(let dz=-1;dz<=1;dz++){
       const nx=x+dx, nz=z+dz;
@@ -365,31 +358,27 @@ function terrainBlockAt(x,y,z){
   }
   
   if(y === h-1) return surfaceBlockFor(biome,h);
-  if(y >= h-4) return (biome===BIOME_DESERT ? SAND : DIRT);
+  // ★ 地下を深く（y=-44まで）
+  if(y >= h-5) return (biome===BIOME_DESERT ? SAND : DIRT);
   return STONE;
 }
 
 /* =========================================================
-   インベントリ
+   インベントリ（所持ブロック管理）
    ========================================================= */
 const inventory = {};
 const BLOCK_NAMES = {
   [GRASS]: "草", [DIRT]: "土", [STONE]: "石",
-  [WOOD]: "木材", [LEAVES]: "葉", [SAND]: "砂"
+  [WOOD]: "木材", [LEAVES]: "葉", [SAND]: "砂",
+  [BEDROCK]: "岩盤"
 };
 
-// ★ 選択中のブロック（ホットバーと連動）
-let selectedType = GRASS;
-const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND];
-let selectedIndex = 0;
-
 function addToInventory(type, count){
-  if(type === AIR) return;
+  if(type === AIR || type === BEDROCK) return; // 岩盤は取得不可
   if(!inventory[type]) inventory[type] = 0;
   inventory[type] += count;
   updateInventoryDisplay();
   updateHotbarCounts();
-  updateSelectedBlockDisplay();
 }
 
 function getInventoryCount(type){
@@ -397,11 +386,11 @@ function getInventoryCount(type){
 }
 
 function useFromInventory(type){
+  if(type === BEDROCK) return false; // 岩盤は設置不可
   if(!inventory[type] || inventory[type] <= 0) return false;
   inventory[type]--;
   updateInventoryDisplay();
   updateHotbarCounts();
-  updateSelectedBlockDisplay();
   return true;
 }
 
@@ -409,7 +398,7 @@ function updateInventoryDisplay(){
   const container = document.getElementById("inventoryDisplay");
   const keys = Object.keys(inventory).filter(k => inventory[k] > 0);
   if(keys.length === 0){
-    container.innerHTML = '<span style="color:#888;font-size:10px;">空</span>';
+    container.innerHTML = '<span style="color:#888;font-size:10px;">インベントリ空</span>';
     return;
   }
   let html = "";
@@ -424,59 +413,13 @@ function updateInventoryDisplay(){
   container.innerHTML = html;
 }
 
-function updateSelectedBlockDisplay(){
-  const name = BLOCK_NAMES[selectedType] || "不明";
-  document.getElementById("selectedBlockName").textContent = name;
-  // ホットバーの選択も更新
-  document.querySelectorAll(".hotslot").forEach((slot, i)=>{
-    slot.classList.toggle("selected", i === selectedIndex);
-  });
-}
-
-// ★ 左右矢印でブロック選択
-function selectPrevBlock(){
-  let idx = selectedIndex - 1;
-  if(idx < 0) idx = HOTBAR_BLOCKS.length - 1;
-  selectedIndex = idx;
-  selectedType = HOTBAR_BLOCKS[idx];
-  updateSelectedBlockDisplay();
-}
-
-function selectNextBlock(){
-  let idx = selectedIndex + 1;
-  if(idx >= HOTBAR_BLOCKS.length) idx = 0;
-  selectedIndex = idx;
-  selectedType = HOTBAR_BLOCKS[idx];
-  updateSelectedBlockDisplay();
-}
-
-// ホットバーのカウント更新
-function updateHotbarCounts(){
-  const slots = document.querySelectorAll(".hotslot");
-  slots.forEach((slot, i)=>{
-    const type = HOTBAR_BLOCKS[i];
-    const count = getInventoryCount(type);
-    const countEl = slot.querySelector(".slot-count");
-    if(countEl) countEl.textContent = count > 0 ? count : "";
-  });
-}
-
-// ホットバーのスロットをクリックで選択
-function selectSlot(slot, index){
-  document.querySelectorAll(".hotslot").forEach(s => s.classList.remove("selected"));
-  slot.classList.add("selected");
-  selectedIndex = index;
-  selectedType = HOTBAR_BLOCKS[index];
-  updateSelectedBlockDisplay();
-}
-
 /* =========================================================
    ワールド差分（Firebase同期）
    ========================================================= */
 const overrides = new Map();
 function key(x,y,z){ return x+","+y+","+z; }
 function getBlock(x,y,z){
-  if(y < -40) return STONE;
+  if(y < -50) return BEDROCK;
   if(y > 60) return AIR;
   const k = key(x,y,z);
   if(overrides.has(k)) return overrides.get(k);
@@ -496,6 +439,7 @@ scene.fog = new THREE.Fog(0x8fc7f0, 20, 62);
 const camera = new THREE.PerspectiveCamera(70, 16/9, 0.05, 90);
 camera.rotation.order = "YXZ";
 
+// 昼夜サイクル用の光
 const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a3f, 0.9);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff3d0, 0.85);
@@ -581,21 +525,26 @@ const texWoodTop = makeTexture(ctx=>{
 });
 const texLeaves = makeTexture(ctx=>{ noiseFill(ctx, ["#3f8f3a","#357a31","#4aa143","#2f6e2c"]); });
 const texSand = makeTexture(ctx=>{ noiseFill(ctx, ["#ddd08a","#d3c37c","#e6d894"]); });
+const texBedrock = makeTexture(ctx=>{
+  noiseFill(ctx, ["#4a4a4a","#555555","#404040","#5a5a5a"]);
+  for(let x=0;x<16;x+=4){ for(let y=0;y<16;y+=4){ ctx.fillStyle="rgba(30,30,30,0.3)"; ctx.fillRect(x,y,2,2); } }
+});
 
 function mat(tex){ return new THREE.MeshLambertMaterial({ map: tex }); }
 const M_GRASS_TOP = mat(texGrassTop), M_GRASS_SIDE = mat(texGrassSide), M_DIRT = mat(texDirt);
 const M_STONE = mat(texStone), M_WOOD_SIDE = mat(texWoodSide), M_WOOD_TOP = mat(texWoodTop);
-const M_LEAVES = mat(texLeaves), M_SAND = mat(texSand);
+const M_LEAVES = mat(texLeaves), M_SAND = mat(texSand), M_BEDROCK = mat(texBedrock);
 
 const boxGeo = new THREE.BoxGeometry(1,1,1);
 
 const BLOCK_DEFS = {
   [GRASS]: { materials: [M_GRASS_SIDE,M_GRASS_SIDE,M_GRASS_TOP,M_DIRT,M_GRASS_SIDE,M_GRASS_SIDE], chunkMax: 260, name:"草" },
   [DIRT]:  { materials: M_DIRT, chunkMax: 500, name:"土" },
-  [STONE]: { materials: M_STONE, chunkMax: 950, name:"石" },
+  [STONE]: { materials: M_STONE, chunkMax: 1200, name:"石" },
   [WOOD]:  { materials: [M_WOOD_SIDE,M_WOOD_SIDE,M_WOOD_TOP,M_WOOD_TOP,M_WOOD_SIDE,M_WOOD_SIDE], chunkMax: 120, name:"木材" },
   [LEAVES]:{ materials: M_LEAVES, chunkMax: 260, name:"葉" },
   [SAND]:  { materials: M_SAND, chunkMax: 260, name:"砂" },
+  [BEDROCK]: { materials: M_BEDROCK, chunkMax: 200, name:"岩盤" },
 };
 const dummy = new THREE.Object3D();
 
@@ -604,7 +553,7 @@ const dummy = new THREE.Object3D();
    ========================================================= */
 const CHUNK_SIZE = 12;
 const RENDER_DIST = 2;
-const RENDER_DEPTH = 7;
+const RENDER_DEPTH = 20; // より深く表示
 const chunks = new Map();
 
 function createChunkMeshSet(){
@@ -644,7 +593,7 @@ function buildChunk(cx,cz){
     const x = startX+lx, z = startZ+lz;
     const h = columnHeight(x,z);
     const top = h + 5;
-    const bottom = Math.max(0, h-RENDER_DEPTH);
+    const bottom = -50; // 深くまで
     for(let y=bottom;y<top;y++){
       const k = key(x,y,z);
       if(overrides.has(k)) continue;
@@ -815,13 +764,17 @@ const input = { moveX:0, moveY:0, jump:false };
 document.getElementById("jumpBtn").addEventListener("touchstart", e=>{ e.preventDefault(); input.jump = true; }, {passive:false});
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump = true);
 
+// ★ 選択中のブロック
+let selectedType = GRASS;
+
 // ★ ホットバー構築
+const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND, BEDROCK];
 (function setupHotbar(){
   const bar = document.getElementById("hotbar");
   HOTBAR_BLOCKS.forEach((t,i)=>{
     const slot = document.createElement("div");
     slot.className = "hotslot" + (i===0 ? " selected":"");
-    slot.dataset.index = i;
+    slot.dataset.blockType = t;
     
     const c = document.createElement("canvas"); c.width=16; c.height=16;
     const ctx = c.getContext("2d");
@@ -835,24 +788,70 @@ document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump
     countSpan.textContent = "0";
     slot.appendChild(countSpan);
     
+    const label = document.createElement("span");
+    label.className = "slot-label";
+    label.textContent = BLOCK_NAMES[t]?.charAt(0) || "?";
+    slot.appendChild(label);
+    
     slot.addEventListener("touchstart", e=>{
       e.preventDefault();
-      selectSlot(slot, i);
+      selectSlot(slot);
     }, {passive:false});
     slot.addEventListener("mousedown", (e)=>{
       e.preventDefault();
-      selectSlot(slot, i);
+      selectSlot(slot);
     });
     
     bar.appendChild(slot);
   });
 })();
 
-// ★ 左右矢印イベント
-document.getElementById("arrowLeft").addEventListener("click", selectPrevBlock);
-document.getElementById("arrowLeft").addEventListener("touchstart", e=>{ e.preventDefault(); selectPrevBlock(); }, {passive:false});
-document.getElementById("arrowRight").addEventListener("click", selectNextBlock);
-document.getElementById("arrowRight").addEventListener("touchstart", e=>{ e.preventDefault(); selectNextBlock(); }, {passive:false});
+function selectSlot(slot){
+  document.querySelectorAll(".hotslot").forEach(s => s.classList.remove("selected"));
+  slot.classList.add("selected");
+  selectedType = parseInt(slot.dataset.blockType);
+  updateHotbarCounts();
+}
+
+function updateHotbarCounts(){
+  const slots = document.querySelectorAll(".hotslot");
+  slots.forEach((slot)=>{
+    const type = parseInt(slot.dataset.blockType);
+    const count = getInventoryCount(type);
+    const countEl = slot.querySelector(".slot-count");
+    if(countEl) countEl.textContent = count > 0 ? count : "";
+  });
+}
+
+// ★ 矢印でブロック選択
+let selectedSlotIndex = 0;
+document.getElementById("arrowLeft").addEventListener("click", ()=>{
+  const slots = document.querySelectorAll(".hotslot");
+  if(slots.length === 0) return;
+  selectedSlotIndex = (selectedSlotIndex - 1 + slots.length) % slots.length;
+  selectSlot(slots[selectedSlotIndex]);
+});
+document.getElementById("arrowRight").addEventListener("click", ()=>{
+  const slots = document.querySelectorAll(".hotslot");
+  if(slots.length === 0) return;
+  selectedSlotIndex = (selectedSlotIndex + 1) % slots.length;
+  selectSlot(slots[selectedSlotIndex]);
+});
+// タッチ対応
+document.getElementById("arrowLeft").addEventListener("touchstart", (e)=>{
+  e.preventDefault();
+  const slots = document.querySelectorAll(".hotslot");
+  if(slots.length === 0) return;
+  selectedSlotIndex = (selectedSlotIndex - 1 + slots.length) % slots.length;
+  selectSlot(slots[selectedSlotIndex]);
+}, {passive:false});
+document.getElementById("arrowRight").addEventListener("touchstart", (e)=>{
+  e.preventDefault();
+  const slots = document.querySelectorAll(".hotslot");
+  if(slots.length === 0) return;
+  selectedSlotIndex = (selectedSlotIndex + 1) % slots.length;
+  selectSlot(slots[selectedSlotIndex]);
+}, {passive:false});
 
 const raycaster = new THREE.Raycaster();
 raycaster.far = 7;
@@ -888,7 +887,8 @@ function doBreak(){
   const hit = raycastBlock();
   if(!hit) return;
   const block = getBlock(hit.x, hit.y, hit.z);
-  if(block === AIR || block === LEAVES) return;
+  // ★ 岩盤は壊せない
+  if(block === AIR || block === LEAVES || block === BEDROCK) return;
   
   addToInventory(block, 1);
   pushBlockChange(hit.x, hit.y, hit.z, AIR);
@@ -898,6 +898,8 @@ function doPlace(){
   const hit = raycastBlock();
   if(!hit) return;
   
+  // ★ 岩盤は設置不可
+  if(selectedType === BEDROCK) return;
   if(getInventoryCount(selectedType) <= 0) return;
   
   const nx = hit.x + Math.round(hit.normal.x);
@@ -1020,7 +1022,8 @@ function animate(){
     if(player.vel.y < 0) player.onGround = true;
     player.vel.y = 0;
   }
-  if(player.pos.y < -10){
+  // ★ 死亡判定を深くに変更
+  if(player.pos.y < -60){
     player.pos.y = columnHeight(Math.floor(player.pos.x), Math.floor(player.pos.z)) + 3;
     player.vel.set(0,0,0);
   }
@@ -1055,7 +1058,6 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   updateChunks();
   updateInventoryDisplay();
   updateHotbarCounts();
-  updateSelectedBlockDisplay();
   animate();
 });
 
