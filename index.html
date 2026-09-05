@@ -41,80 +41,36 @@
   #startStatus { font-size:11px; opacity:.85; }
   #rotateHint { font-size:11px; opacity:.8; margin-top:-4px; }
 
-  #hud { position:absolute; inset:0; z-index:20; pointer-events:none; display:none; }
-  #crosshair {
-    position:absolute; top:50%; left:50%; width:16px; height:16px; transform:translate(-50%,-50%);
+  /* ★ HUD全体のpointer-eventsをautoにして、子要素が操作できるように */
+  #hud { 
+    position:absolute; inset:0; z-index:20; 
+    pointer-events:none; /* デフォルトはnone */
+    display:none; 
   }
-  #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,.85); box-shadow:0 0 1px rgba(0,0,0,.6); }
-  #crosshair::before { left:7px; top:0; width:2px; height:16px; }
-  #crosshair::after { top:7px; left:0; height:2px; width:16px; }
+  /* ★ 操作可能な要素は個別にpointer-events:autoを設定 */
+  #crosshair { pointer-events:none; }
+  #topBar { pointer-events:none; }
+  #topBar button { pointer-events:auto; }
+  #playerList { pointer-events:none; }
+  #coords { pointer-events:none; }
+  #fpsBadge { pointer-events:none; }
+  #timeBadge { pointer-events:none; }
 
-  #topBar {
-    position:absolute; top:6px; left:6px; right:6px;
-    display:flex; justify-content:space-between; align-items:flex-start;
-    font-size:10.5px; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,.7); gap:6px;
-  }
-  #playerList { background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px; max-width:52vw; }
-  #coords {
-    background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px;
-    white-space:nowrap; text-align:right; font-weight:700; color:#ffd700;
-  }
-  #fpsBadge { font-size:9px; opacity:.65; color:#fff; margin-top:2px; text-align:right; }
-  #timeBadge { font-size:9px; opacity:.8; color:#fff; margin-top:1px; text-align:right; }
+  #joyBase { pointer-events:auto; }
+  #joyStick { pointer-events:none; }
 
-  /* ★ リセットボタン（ワンクリック） */
-  #resetWorldBtn {
-    background:rgba(220,53,69,0.85);
-    border:2px solid rgba(255,255,255,0.6);
-    color:#fff;
-    padding:3px 14px;
-    border-radius:6px;
-    font-size:10px;
-    cursor:pointer;
-    pointer-events:auto;
-    font-weight:700;
-    margin-top:3px;
-    transition:0.2s;
-    text-shadow:0 1px 2px rgba(0,0,0,0.5);
-  }
-  #resetWorldBtn:hover { background:rgba(220,53,69,1); transform:scale(1.02); }
-  #resetWorldBtn:active { transform:scale(0.93); }
-  #resetWorldBtn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  #actionArea { pointer-events:auto; }
+  .abtn { pointer-events:auto; }
 
-  #joyBase {
-    position:absolute; left:28px; bottom:28px;
-    width:100px; height:100px; border-radius:50%;
-    background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.4);
-    pointer-events:auto;
-  }
-  #joyStick {
-    position:absolute; left:30px; top:30px;
-    width:40px; height:40px; border-radius:50%;
-    background:rgba(255,255,255,.55); border:2px solid rgba(255,255,255,.7);
-  }
-
-  #actionArea {
-    position:absolute; right:28px; bottom:28px;
-    display:flex; flex-direction:column; align-items:flex-end; gap:10px;
-    pointer-events:auto;
-  }
-  .actionRow { display:flex; gap:12px; }
-  .abtn {
-    width:60px; height:60px; border-radius:50%;
-    background:rgba(20,20,20,.5); border:2px solid rgba(255,255,255,.6);
-    display:flex; align-items:center; justify-content:center;
-    font-size:24px; color:#fff;
-  }
-  .abtn:active { background:rgba(20,20,20,.8); transform:scale(0.92); }
-  #jumpBtn { width:68px; height:68px; font-size:13px; font-weight:700; }
-
-  /* ★ インベントリ（ホットバー） */
+  /* ★ ホットバー（インベントリ）は確実に操作可能に */
   #hotbar {
     position:absolute; bottom:120px; left:50%; transform:translateX(-50%);
     display:flex; gap:5px; background:rgba(0,0,0,.55); padding:6px 10px;
-    border-radius:12px; pointer-events:auto;
+    border-radius:12px; 
+    pointer-events:auto !important; /* ★ 強制的に有効化 */
     max-width:80vw;
     border:2px solid rgba(255,255,255,.15);
+    z-index:30;
   }
   .hotslot {
     width:44px; height:44px; flex:0 0 auto; border-radius:8px;
@@ -124,8 +80,10 @@
     cursor:pointer;
     transition:0.15s;
     display:flex; align-items:center; justify-content:center;
+    position:relative;
+    pointer-events:auto !important; /* ★ 強制的に有効化 */
   }
-  .hotslot canvas { width:100%; height:100%; image-rendering:pixelated; }
+  .hotslot canvas { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; }
   .hotslot.selected { 
     border-color:#fff; 
     box-shadow:0 0 12px rgba(255,255,255,.7);
@@ -143,9 +101,40 @@
     padding:0 4px;
     border-radius:2px;
     white-space:nowrap;
+    pointer-events:none;
   }
 
   #lookLayer { position:absolute; inset:0; pointer-events:auto; }
+
+  /* ★ リセットボタンは確実に操作可能に */
+  #resetWorldBtn {
+    background:rgba(220,53,69,0.85);
+    border:2px solid rgba(255,255,255,0.6);
+    color:#fff;
+    padding:3px 14px;
+    border-radius:6px;
+    font-size:10px;
+    cursor:pointer;
+    pointer-events:auto !important;
+    font-weight:700;
+    margin-top:3px;
+    transition:0.2s;
+    text-shadow:0 1px 2px rgba(0,0,0,0.5);
+    z-index:30;
+  }
+  #resetWorldBtn:hover { background:rgba(220,53,69,1); transform:scale(1.02); }
+  #resetWorldBtn:active { transform:scale(0.93); }
+  #resetWorldBtn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+  /* トップバーの右側グループは操作可能に */
+  .topbar-right {
+    display:flex; 
+    flex-direction:column; 
+    align-items:flex-end; 
+    gap:2px;
+    pointer-events:none;
+  }
+  .topbar-right > * { pointer-events:auto; }
 </style>
 </head>
 <body>
@@ -167,7 +156,7 @@
       <div>
         <div id="playerList">👥 読込中...</div>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+      <div class="topbar-right">
         <div id="coords">X:0 Y:0 Z:0</div>
         <div id="timeBadge">☀️ 昼</div>
         <div id="fpsBadge"></div>
@@ -175,7 +164,7 @@
       </div>
     </div>
 
-    <!-- ★ インベントリ（ホットバー） -->
+    <!-- インベントリ（ホットバー） -->
     <div id="hotbar"></div>
 
     <div id="lookLayer"></div>
@@ -273,12 +262,13 @@ function fbm(x,z,seed,octaves){
 }
 
 /* =========================================================
-   地形・バイオーム定義（深さ-5に変更）
+   地形・バイオーム定義（深さ-5）
    ========================================================= */
 const AIR=0, GRASS=1, DIRT=2, STONE=3, WOOD=4, LEAVES=5, SAND=6, BEDROCK=7;
 const COBBLESTONE=8, PLANKS=9;
 
 const BIOME_DESERT=0, BIOME_PLAINS=1, BIOME_FOREST=2, BIOME_MOUNTAIN=3;
+const BOTTOM_Y = -5;
 
 function columnBiome(x,z){
   const v = fbm(x*0.015, z*0.015, 900, 3);
@@ -318,9 +308,6 @@ function columnTreeHeight(x,z){
   return 3 + Math.floor(hashInt(x+51, z+19, 321)*3);
 }
 
-/* ★ 深さを -5 に変更 */
-const BOTTOM_Y = -5;
-
 function terrainBlockAt(x,y,z){
   const biome = columnBiome(x,z);
   const h = columnHeight(x,z);
@@ -349,7 +336,7 @@ function terrainBlockAt(x,y,z){
 }
 
 /* =========================================================
-   ワールド差分（Firebase同期）
+   ワールド差分
    ========================================================= */
 const overrides = new Map();
 function key(x,y,z){ return x+","+y+","+z; }
@@ -468,7 +455,7 @@ const BLOCK_DEFS = {
 const dummy = new THREE.Object3D();
 
 /* =========================================================
-   チャンク管理（軽量化）
+   チャンク管理
    ========================================================= */
 const CHUNK_SIZE = 10;
 const RENDER_DIST = 2;
@@ -562,15 +549,23 @@ function invalidateAllChunks(){
 }
 
 /* =========================================================
-   ★ ワールドリセット（ワンクリック） ★
+   ★ ワールドリセット（動作確認用ログ追加） ★
    ========================================================= */
 (function setupResetButton(){
   const resetBtn = document.getElementById('resetWorldBtn');
-  if (!resetBtn) return;
+  if (!resetBtn) {
+    console.error('❌ リセットボタンが見つかりません');
+    return;
+  }
 
-  resetBtn.addEventListener('click', async function() {
-    // ★ 確認は1回だけ
+  console.log('✅ リセットボタンを設定しました');
+
+  resetBtn.addEventListener('click', async function(e) {
+    e.stopPropagation();
+    console.log('🔄 リセットボタンがクリックされました');
+    
     if (!confirm('🗑 ワールドをリセットしますか？\n全てのブロックが元の地形に戻ります。')) {
+      console.log('❌ リセットキャンセル');
       return;
     }
 
@@ -579,7 +574,10 @@ function invalidateAllChunks(){
     this.style.opacity = '0.5';
 
     try {
+      console.log('🗑️ Firebaseデータ削除開始...');
       await db.ref(ROOM + '/blocks').remove();
+      console.log('✅ Firebase削除完了');
+      
       overrides.clear();
       invalidateAllChunks();
       updateChunks();
@@ -591,7 +589,10 @@ function invalidateAllChunks(){
       player.vel.set(0, 0, 0);
 
       alert('✅ リセット完了！');
+      console.log('✅ リセット完了');
+
     } catch (error) {
+      console.error('❌ リセットエラー:', error);
       alert('❌ エラー: ' + error.message);
     }
 
@@ -726,7 +727,7 @@ const input = { moveX:0, moveY:0, jump:false };
 document.getElementById("jumpBtn").addEventListener("touchstart", e=>{ e.preventDefault(); input.jump = true; }, {passive:false});
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump = true);
 
-/* ★ インベントリ（ホットバー）ブロック選択 */
+/* ★ インベントリ（ホットバー） */
 let selectedType = GRASS;
 const HOTBAR_BLOCKS = [
   { id: GRASS, name: '草' },
@@ -740,16 +741,23 @@ const HOTBAR_BLOCKS = [
 ];
 
 (function setupHotbar(){
-  const bar = document.getElementById("hotbar");
+  const bar = document.getElementById('hotbar');
+  if (!bar) {
+    console.error('❌ ホットバーが見つかりません');
+    return;
+  }
+  console.log('✅ ホットバーを設定します');
+
   bar.innerHTML = '';
   HOTBAR_BLOCKS.forEach((blockInfo, i)=>{
-    const slot = document.createElement("div");
-    slot.className = "hotslot" + (i === 0 ? " selected" : "");
-    slot.style.position = 'relative';
+    const slot = document.createElement('div');
+    slot.className = 'hotslot' + (i === 0 ? ' selected' : '');
+    slot.dataset.blockId = blockInfo.id;
+    slot.dataset.index = i;
     
-    const c = document.createElement("canvas");
+    const c = document.createElement('canvas');
     c.width = 16; c.height = 16;
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext('2d');
     const def = BLOCK_DEFS[blockInfo.id];
     if(def){
       const m = Array.isArray(def.materials) ? def.materials[2] : def.materials;
@@ -757,22 +765,35 @@ const HOTBAR_BLOCKS = [
     }
     slot.appendChild(c);
     
-    // ブロック名ラベル
-    const label = document.createElement("span");
-    label.className = "block-label";
+    const label = document.createElement('span');
+    label.className = 'block-label';
     label.textContent = blockInfo.name;
     slot.appendChild(label);
     
-    slot.addEventListener("touchstart", e=>{ e.preventDefault(); select(); }, {passive:false});
-    slot.addEventListener("mousedown", select);
+    // クリック/タッチイベント
+    slot.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const blockId = parseInt(this.dataset.blockId);
+      console.log('🔨 ブロック選択:', blockId, BLOCK_DEFS[blockId]?.name);
+      selectedType = blockId;
+      document.querySelectorAll('.hotslot').forEach(ch => ch.classList.remove('selected'));
+      this.classList.add('selected');
+    });
     
-    function select(){
-      selectedType = blockInfo.id;
-      document.querySelectorAll('.hotslot').forEach(ch=>ch.classList.remove('selected'));
-      slot.classList.add('selected');
-    }
+    slot.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const blockId = parseInt(this.dataset.blockId);
+      console.log('🔨 ブロック選択:', blockId, BLOCK_DEFS[blockId]?.name);
+      selectedType = blockId;
+      document.querySelectorAll('.hotslot').forEach(ch => ch.classList.remove('selected'));
+      this.classList.add('selected');
+    }, {passive:false});
+    
     bar.appendChild(slot);
   });
+  
+  console.log('✅ ホットバー設定完了');
 })();
 
 const raycaster = new THREE.Raycaster();
