@@ -129,7 +129,7 @@
 
   <div id="startScreen">
     <h1>⛏ Mini Craft Online</h1>
-    <p>チャンク式無限ワールド。プレイヤー同期のみ（ブロックは保存されません）</p>
+    <p>チャンク式無限ワールド。昼夜サイクル・地下深くまで探索可能。</p>
     <input id="nameInput" maxlength="10" placeholder="ニックネーム" value="Craft">
     <button id="startBtn">ワールドに入る</button>
     <div id="startStatus">Firebase接続待機中...</div>
@@ -320,7 +320,7 @@ function terrainBlockAt(x,y,z){
 }
 
 /* =========================================================
-   ワールド状態（ローカルメモリのみ）
+   ワールド差分（Firebase同期）
    ========================================================= */
 const overrides = new Map();
 function key(x,y,z){ return x+","+y+","+z; }
@@ -337,23 +337,21 @@ function getBlock(x,y,z){
    ========================================================= */
 const canvas = document.getElementById("gameCanvas");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:"low-power" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fc7f0);
-scene.fog = new THREE.Fog(0x8fc7f0, 20, 62);
+scene.fog = new THREE.Fog(0x8fc7f0, 18, 50);
 
-const camera = new THREE.PerspectiveCamera(70, 16/9, 0.05, 90);
+const camera = new THREE.PerspectiveCamera(68, 16/9, 0.05, 80);
 camera.rotation.order = "YXZ";
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a3f, 0.9);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a3f, 0.6);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff3d0, 0.85);
-sun.position.set(15, 25, 10);
-scene.add(sun);
 
-const ambientLight = new THREE.AmbientLight(0x404060, 0.3);
+/* ★ 明るさ調整（昼でも眩しすぎない） */
+const ambientLight = new THREE.AmbientLight(0x404060, 0.35);
 scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffeedd, 1.0);
+const dirLight = new THREE.DirectionalLight(0xffeedd, 0.7);
 dirLight.position.set(30, 40, 20);
 scene.add(dirLight);
 
@@ -429,24 +427,24 @@ const M_COBBLESTONE = mat(texCobblestone), M_PLANKS = mat(texPlanks);
 const boxGeo = new THREE.BoxGeometry(1,1,1);
 
 const BLOCK_DEFS = {
-  [GRASS]: { materials: [M_GRASS_SIDE,M_GRASS_SIDE,M_GRASS_TOP,M_DIRT,M_GRASS_SIDE,M_GRASS_SIDE], chunkMax: 260, name:"草" },
-  [DIRT]:  { materials: M_DIRT, chunkMax: 500, name:"土" },
-  [STONE]: { materials: M_STONE, chunkMax: 950, name:"石" },
-  [WOOD]:  { materials: [M_WOOD_SIDE,M_WOOD_SIDE,M_WOOD_TOP,M_WOOD_TOP,M_WOOD_SIDE,M_WOOD_SIDE], chunkMax: 120, name:"木材" },
-  [LEAVES]:{ materials: M_LEAVES, chunkMax: 260, name:"葉" },
-  [SAND]:  { materials: M_SAND, chunkMax: 260, name:"砂" },
-  [BEDROCK]: { materials: M_BEDROCK, chunkMax: 100, name:"岩盤" },
-  [COBBLESTONE]: { materials: M_COBBLESTONE, chunkMax: 200, name:"丸石" },
-  [PLANKS]: { materials: M_PLANKS, chunkMax: 200, name:"板材" },
+  [GRASS]: { materials: [M_GRASS_SIDE,M_GRASS_SIDE,M_GRASS_TOP,M_DIRT,M_GRASS_SIDE,M_GRASS_SIDE], chunkMax: 200, name:"草" },
+  [DIRT]:  { materials: M_DIRT, chunkMax: 400, name:"土" },
+  [STONE]: { materials: M_STONE, chunkMax: 800, name:"石" },
+  [WOOD]:  { materials: [M_WOOD_SIDE,M_WOOD_SIDE,M_WOOD_TOP,M_WOOD_TOP,M_WOOD_SIDE,M_WOOD_SIDE], chunkMax: 100, name:"木材" },
+  [LEAVES]:{ materials: M_LEAVES, chunkMax: 200, name:"葉" },
+  [SAND]:  { materials: M_SAND, chunkMax: 200, name:"砂" },
+  [BEDROCK]: { materials: M_BEDROCK, chunkMax: 80, name:"岩盤" },
+  [COBBLESTONE]: { materials: M_COBBLESTONE, chunkMax: 160, name:"丸石" },
+  [PLANKS]: { materials: M_PLANKS, chunkMax: 160, name:"板材" },
 };
 const dummy = new THREE.Object3D();
 
 /* =========================================================
-   チャンク管理
+   チャンク管理（軽量化）
    ========================================================= */
-const CHUNK_SIZE = 12;
+const CHUNK_SIZE = 10;
 const RENDER_DIST = 2;
-const RENDER_DEPTH = 40;
+const RENDER_DEPTH = 35;
 const chunks = new Map();
 
 function createChunkMeshSet(){
@@ -485,7 +483,7 @@ function buildChunk(cx,cz){
   for(let lx=0;lx<CHUNK_SIZE;lx++) for(let lz=0;lz<CHUNK_SIZE;lz++){
     const x = startX+lx, z = startZ+lz;
     const h = columnHeight(x,z);
-    const top = h + 5;
+    const top = h + 4;
     const bottom = -30;
     for(let y=bottom;y<top;y++){
       const k = key(x,y,z);
@@ -536,21 +534,10 @@ function invalidateAllChunks(){
 }
 
 /* =========================================================
-   ★ ブロック変更（ローカルメモリのみ、Firebase保存なし） ★
-   ========================================================= */
-function pushBlockChange(x,y,z,type){
-  if(y < -30) return;
-  overrides.set(key(x,y,z), type);
-  invalidateAllChunks();
-  updateChunks();
-  // ★ Firebaseには保存しない
-}
-
-/* =========================================================
-   ★ ワールドリセット（ローカルデータのみクリア） ★
+   ★ ワールドリセット（Firebase完全削除） ★
    ========================================================= */
 document.getElementById('resetWorldBtn').addEventListener('click', async function() {
-  if (!confirm('⚠️ 本当にワールドをリセットしますか？\n\n全てのブロック変更が消去され、元の地形に戻ります。')) {
+  if (!confirm('⚠️ 本当にワールドをリセットしますか？\n\n全てのブロックデータが消去され、元の地形に戻ります。')) {
     return;
   }
   
@@ -564,16 +551,22 @@ document.getElementById('resetWorldBtn').addEventListener('click', async functio
   btn.style.opacity = '0.5';
 
   try {
-    // ローカルのオーバーライドをクリア
+    // 1. Firebaseのブロックデータを全て削除（ルートごと削除）
+    await db.ref(ROOM + '/blocks').remove();
+    console.log('✅ Firebaseブロックデータ完全削除完了');
+
+    // 2. ローカルのオーバーライドをクリア
     overrides.clear();
     
-    // チャンクを再構築
+    // 3. チャンクを再構築
     invalidateAllChunks();
     updateChunks();
 
-    // プレイヤーを安全な位置に移動
-    const resetY = columnHeight(Math.floor(player.pos.x), Math.floor(player.pos.z)) + 3;
-    player.pos.y = resetY;
+    // 4. プレイヤーを安全な位置に移動
+    const resetX = Math.floor(player.pos.x);
+    const resetZ = Math.floor(player.pos.z);
+    const resetY = columnHeight(resetX, resetZ) + 3;
+    player.pos.set(resetX + 0.5, resetY, resetZ + 0.5);
     player.vel.set(0,0,0);
 
     alert('✅ ワールドがリセットされました！');
@@ -587,6 +580,29 @@ document.getElementById('resetWorldBtn').addEventListener('click', async functio
   btn.textContent = '🌍 ワールドリセット';
   btn.style.opacity = '1';
 });
+
+/* =========================================================
+   Firebase差分同期
+   ========================================================= */
+db.ref(ROOM + "/blocks").on("value", snap=>{
+  const val = snap.val() || {};
+  overrides.clear();
+  Object.keys(val).forEach(k=>{
+    const parts = k.split("_").map(Number);
+    if(parts[1] < -30) return;
+    overrides.set(parts.join(","), val[k]);
+  });
+  invalidateAllChunks();
+  updateChunks();
+});
+
+function pushBlockChange(x,y,z,type){
+  if(y < -30) return;
+  overrides.set(key(x,y,z), type);
+  invalidateAllChunks();
+  updateChunks();
+  db.ref(ROOM + "/blocks/" + x + "_" + y + "_" + z).set(type);
+}
 
 /* =========================================================
    プレイヤー
@@ -717,7 +733,8 @@ const HOTBAR_BLOCKS = [GRASS, DIRT, STONE, WOOD, LEAVES, SAND, COBBLESTONE, PLAN
 })();
 
 const raycaster = new THREE.Raycaster();
-raycaster.far = 7;
+raycaster.far = 6;
+
 function raycastBlock(){
   raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
   let best = null, bestType = null, bestChunk = null;
@@ -769,7 +786,7 @@ function doPlace(){
 }
 
 /* =========================================================
-   他プレイヤー表示（Firebase同期）
+   他プレイヤー表示
    ========================================================= */
 const otherPlayers = {};
 function makeNameSprite(name, colorHex){
@@ -801,7 +818,7 @@ playersRef.child(myId).onDisconnect().remove();
 
 let lastSent = 0;
 function sendMyState(now){
-  if(now - lastSent < 120) return;
+  if(now - lastSent < 150) return;
   lastSent = now;
   playersRef.child(myId).set({
     x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2),
@@ -834,7 +851,7 @@ playersRef.on("value", snap=>{
 });
 
 /* =========================================================
-   昼夜サイクル
+   昼夜サイクル（明るさ調整済み）
    ========================================================= */
 const DAY_LENGTH = 120;
 let timeOfDay = 0;
@@ -845,20 +862,21 @@ function updateDayNightCycle(dt){
   
   const angle = timeOfDay * Math.PI * 2;
   const sunHeight = Math.sin(angle);
-  const sunX = Math.cos(angle) * 40;
-  const sunY = Math.max(-10, sunHeight * 40);
-  const sunZ = Math.sin(angle * 0.7) * 30;
+  const sunX = Math.cos(angle) * 35;
+  const sunY = Math.max(-5, sunHeight * 30);
+  const sunZ = Math.sin(angle * 0.7) * 25;
   
   dirLight.position.set(sunX, sunY, sunZ);
   
-  const brightness = Math.max(0.1, Math.min(1, (sunHeight + 0.5) * 1.2));
-  dirLight.intensity = brightness * 1.2;
-  ambientLight.intensity = 0.15 + brightness * 0.25;
+  /* ★ 明るさを適度に（眩しすぎない） */
+  const brightness = Math.max(0.15, Math.min(0.85, (sunHeight + 0.5) * 0.9));
+  dirLight.intensity = brightness * 0.6 + 0.15;
+  ambientLight.intensity = 0.2 + brightness * 0.2;
   
-  const skyBright = Math.max(0.1, Math.min(1, (sunHeight + 0.3) * 1.1));
-  const r = 0.55 + skyBright * 0.45;
-  const g = 0.78 + skyBright * 0.22;
-  const b = 0.94 + skyBright * 0.06;
+  const skyBright = Math.max(0.15, Math.min(0.9, (sunHeight + 0.3) * 0.9));
+  const r = 0.5 + skyBright * 0.4;
+  const g = 0.7 + skyBright * 0.25;
+  const b = 0.9 + skyBright * 0.08;
   scene.background.setRGB(r, g, b);
   scene.fog.color.setRGB(r * 0.7, g * 0.7, b * 0.7);
   
@@ -870,17 +888,18 @@ function updateDayNightCycle(dt){
 }
 
 /* =========================================================
-   メインループ
+   メインループ（軽量化）
    ========================================================= */
 const clock = new THREE.Clock();
 const SPEED = 4.3, GRAVITY = 20, JUMP_V = 7.2;
 let fpsCount=0, fpsTimer=0;
 let chunkTimer=0;
+let animFrameId = null;
 const coordsEl = document.getElementById("coords");
 
 function animate(){
-  requestAnimationFrame(animate);
-  const dt = Math.min(0.05, clock.getDelta());
+  animFrameId = requestAnimationFrame(animate);
+  const dt = Math.min(0.04, clock.getDelta());
 
   updateDayNightCycle(dt);
 
@@ -913,14 +932,16 @@ function animate(){
     player.vel.y = 0;
   }
   if(player.pos.y < -40){
-    player.pos.y = columnHeight(Math.floor(player.pos.x), Math.floor(player.pos.z)) + 3;
+    const resetX = Math.floor(player.pos.x);
+    const resetZ = Math.floor(player.pos.z);
+    player.pos.y = columnHeight(resetX, resetZ) + 3;
     player.vel.set(0,0,0);
   }
 
   camera.position.set(player.pos.x, player.pos.y + player.eyeHeight, player.pos.z);
 
   chunkTimer += dt;
-  if(chunkTimer > 0.35){ chunkTimer = 0; updateChunks(); }
+  if(chunkTimer > 0.4){ chunkTimer = 0; updateChunks(); }
 
   const now = performance.now();
   sendMyState(now);
