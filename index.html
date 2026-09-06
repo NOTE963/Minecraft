@@ -142,11 +142,18 @@
   <div class="touchBtn" id="btnPlace">🧱</div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.128.0/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
+window.addEventListener("error", (e) => {
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;top:0;left:0;right:0;background:#a11;color:#fff;z-index:999;padding:10px;font-size:13px;";
+  box.textContent = "読み込みエラー: " + (e.message || "スクリプトの読み込みに失敗しました") + " (" + (e.filename || "") + ")";
+  document.body.appendChild(box);
+});
+
 /* ============================================================
    Firebase 初期化
 ============================================================ */
