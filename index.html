@@ -53,6 +53,8 @@
 
   #topBar { position:absolute; top:6px; left:6px; right:6px; display:flex; justify-content:space-between; align-items:flex-start; font-size:10px; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,.8); gap:6px; }
   #playerList { background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px; max-width:38vw; line-height:1.5; }
+  #hpBar { font-size:13px; letter-spacing:-2px; margin-top:2px; text-shadow:1px 1px 2px rgba(0,0,0,.8); }
+  #damageFlash { position:absolute; inset:0; background:rgba(255,0,0,0); pointer-events:none; transition:background .1s; }
   #coordBox { background:rgba(0,0,0,.4); padding:3px 8px; border-radius:6px; text-align:right; line-height:1.5; font-family:monospace; white-space:nowrap; }
   #biomeTag { color:#ffe08a; }
 
@@ -107,9 +109,11 @@
 
   <div id="hud">
     <div id="crosshair"></div>
+    <div id="damageFlash"></div>
     <div id="topBar">
       <div>
         <div id="playerList">👥 読込中...</div>
+        <div id="hpBar">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
         <div id="fpsBadge"></div>
       </div>
       <div id="coordBox">
@@ -125,6 +129,7 @@
 
     <div id="actionArea">
       <div class="actionCol">
+        <div class="abtn" id="attackBtn">⚔️</div>
         <div class="abtn" id="breakBtn">⛏</div>
         <div class="abtn" id="placeBtn">▦</div>
         <div class="abtn" id="sneakBtn">⬇︎</div>
@@ -226,35 +231,19 @@ function hash2(x,z){
   return ((h ^ (h>>>16)) >>> 0) / 4294967295;
 }
 function biomeAt(x,z){
-  const k = x+","+z;
-  if(biomeCache.has(k)) return biomeCache.get(k);
-  const v = (Math.sin(x*0.021)+Math.cos(z*0.024)+Math.sin(x*0.013+z*0.017)+Math.cos(x*0.011-z*0.015))/4;
-  const b = (v+1)/2; // 0..1
-  biomeCache.set(k,b);
-  return b;
+  // フラットワールド: バイオームは常に「平原」固定にする
+  return 0.4;
 }
 function biomeName(b){ return b<0.28 ? "砂漠" : b<0.55 ? "平原" : b<0.8 ? "森" : "雪山"; }
 function biomeKind(b){ return b<0.28 ? "desert" : b<0.55 ? "plains" : b<0.8 ? "forest" : "mountains"; }
 
+const FLAT_HEIGHT = 4;
 function terrainHeight(x,z){
-  const k = x+","+z;
-  if(heightCache.has(k)) return heightCache.get(k);
-  const b = biomeAt(x,z);
-  const kind = biomeKind(b);
-  const n = Math.sin(x*0.18)+Math.cos(z*0.16)+Math.sin((x+z)*0.09)*1.4+Math.cos((x-z)*0.11)*1.2+Math.sin(x*0.05+z*0.04)*2.5;
-  let base, amp;
-  if(kind==="desert"){ base=4; amp=0.5; }
-  else if(kind==="plains"){ base=5; amp=1.4; }
-  else if(kind==="forest"){ base=6; amp=2.2; }
-  else { base=10; amp=5.5; }
-  let h = Math.round(base + n*amp*0.35 + (kind==="mountains" ? Math.abs(n)*1.6 : 0));
-  h = Math.max(2, Math.min(MAX_Y-2, h));
-  heightCache.set(k,h);
-  return h;
+  return FLAT_HEIGHT; // フラットワールド: どこでも同じ高さ
 }
 
 function isTreeColumn(x,z,kind,h){
-  return (kind==="plains"||kind==="forest") && h>=SEA_LEVEL && hash2(x,z) > (kind==="forest"?0.965:0.992);
+  return false; // フラットワールドでは木を生成しない
 }
 
 // 木のブロック判定 (対象座標の周囲2マス以内にある木の幹/葉かどうかを調べる)
@@ -540,7 +529,39 @@ const player = {
   onGround: false,
   eyeHeight: 1.6,
   sneaking: false,
+  hp: 20, maxHp: 20,
+  fallStartY: null,
+  dead: false,
 };
+
+function flashDamage(){
+  const el = document.getElementById("damageFlash");
+  el.style.background = "rgba(255,0,0,.35)";
+  setTimeout(()=>{ el.style.background = "rgba(255,0,0,0)"; }, 150);
+}
+function updateHpBar(){
+  const hearts = Math.round(player.hp/2);
+  document.getElementById("hpBar").textContent = "❤️".repeat(Math.max(0,hearts)) + "🖤".repeat(Math.max(0,10-hearts));
+}
+function damagePlayer(amount){
+  if(player.dead) return;
+  player.hp = Math.max(0, player.hp - amount);
+  flashDamage();
+  updateHpBar();
+  if(player.hp <= 0) respawnPlayer();
+}
+function respawnPlayer(){
+  player.dead = true;
+  setTimeout(()=>{
+    player.pos.set(0, terrainHeight(0,0)+3, 0);
+    player.vel.set(0,0,0);
+    player.hp = player.maxHp;
+    player.fallStartY = null;
+    player.dead = false;
+    updateHpBar();
+  }, 800);
+}
+updateHpBar();
 function collides(px,py,pz){
   const r = 0.28;
   const heights = [0.05, 0.9, 1.55];
