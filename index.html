@@ -252,7 +252,7 @@ function terrainHeight(x,z){
 }
 
 function isTreeColumn(x,z,kind,h){
-  return (kind==="plains"||kind==="forest") && h>=SEA_LEVEL && hash2(x,z) > (kind==="forest"?0.90:0.975);
+  return (kind==="plains"||kind==="forest") && h>=SEA_LEVEL && hash2(x,z) > (kind==="forest"?0.965:0.992);
 }
 
 // 木のブロック判定 (対象座標の周囲2マス以内にある木の幹/葉かどうかを調べる)
@@ -287,7 +287,10 @@ function getBaseBlock(x,y,z){
 
   const top = h-1;
   if(y > top){
-    if(y===h && !lake) return treeBlockAt(x,y,z);
+    if(!lake){
+      const tb = treeBlockAt(x,y,z);
+      if(tb !== AIR) return tb;
+    }
     return AIR;
   }
   if(y===top){
@@ -505,7 +508,8 @@ function collides(px,py,pz){
   const r = 0.28;
   const heights = [0.05, 0.9, 1.55];
   for(const dx of [-r,r]) for(const dz of [-r,r]) for(const dy of heights){
-    if(getBlock(Math.floor(px+dx), Math.floor(py+dy), Math.floor(pz+dz)) !== AIR) return true;
+    const t = getBlock(Math.floor(px+dx), Math.floor(py+dy), Math.floor(pz+dz));
+    if(t !== AIR && t !== WATER) return true;
   }
   return false;
 }
