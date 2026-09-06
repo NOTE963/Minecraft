@@ -118,8 +118,8 @@
       </div>
     </div>
 
-    <div id="hotbar"></div>
     <div id="lookLayer"></div>
+    <div id="hotbar"></div>
     <div id="joyBase"><div id="joyStick"></div></div>
 
     <div id="actionArea">
@@ -181,6 +181,14 @@ function applyOrientation(){
 }
 window.addEventListener("resize", applyOrientation);
 window.addEventListener("orientationchange", ()=>setTimeout(applyOrientation,200));
+
+// 画面回転中(force-rotate)は、実スクリーン座標とアプリの表示座標が90度ズレる。
+// タッチ/マウス座標をアプリのローカル座標系に変換してからスティックや視点操作に使う。
+function toLocal(clientX, clientY){
+  if(!appEl.classList.contains("force-rotate")) return { x: clientX, y: clientY };
+  const Wp = window.innerWidth; // 実デバイスの横幅(縦持ち時)
+  return { x: clientY, y: Wp - clientX };
+}
 
 function tryRealOrientationLock(){
   try{
@@ -511,12 +519,13 @@ const input = { moveX:0, moveY:0, jump:false };
   const base = document.getElementById("joyBase");
   const stick = document.getElementById("joyStick");
   let touchId=null, cx=0, cy=0; const maxR=32;
-  function start(e){ const t=e.changedTouches?e.changedTouches[0]:e; touchId=t.identifier??"mouse"; const r=base.getBoundingClientRect(); cx=r.left+r.width/2; cy=r.top+r.height/2; }
+  function start(e){ const t=e.changedTouches?e.changedTouches[0]:e; touchId=t.identifier??"mouse"; const r=base.getBoundingClientRect(); const c=toLocal(r.left+r.width/2, r.top+r.height/2); cx=c.x; cy=c.y; }
   function move(e){
     const touches = e.changedTouches?Array.from(e.changedTouches):[e];
     for(const t of touches){
       if((t.identifier??"mouse")!==touchId) continue;
-      let dx=t.clientX-cx, dy=t.clientY-cy;
+      const p = toLocal(t.clientX, t.clientY);
+      let dx=p.x-cx, dy=p.y-cy;
       const dist=Math.min(maxR, Math.hypot(dx,dy)); const ang=Math.atan2(dy,dx);
       dx=Math.cos(ang)*dist; dy=Math.sin(ang)*dist;
       stick.style.transform = `translate(${dx}px,${dy}px)`;
@@ -536,12 +545,13 @@ const input = { moveX:0, moveY:0, jump:false };
 (function setupLook(){
   const layer = document.getElementById("lookLayer");
   let touchId=null, lastX=0, lastY=0; const SENS=0.0035;
-  function start(e){ const t=e.changedTouches?e.changedTouches[0]:e; touchId=t.identifier??"mouse"; lastX=t.clientX; lastY=t.clientY; }
+  function start(e){ const t=e.changedTouches?e.changedTouches[0]:e; touchId=t.identifier??"mouse"; const p=toLocal(t.clientX,t.clientY); lastX=p.x; lastY=p.y; }
   function move(e){
     const touches = e.changedTouches?Array.from(e.changedTouches):[e];
     for(const t of touches){
       if((t.identifier??"mouse")!==touchId) continue;
-      const dx=t.clientX-lastX, dy=t.clientY-lastY; lastX=t.clientX; lastY=t.clientY;
+      const p = toLocal(t.clientX, t.clientY);
+      const dx=p.x-lastX, dy=p.y-lastY; lastX=p.x; lastY=p.y;
       player.yaw -= dx*SENS; player.pitch -= dy*SENS;
       player.pitch = Math.max(-1.5, Math.min(1.5, player.pitch));
     }
