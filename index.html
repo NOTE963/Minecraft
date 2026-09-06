@@ -300,7 +300,7 @@ function getBaseBlock(x,y,z){
     return GRASS;
   }
   if(y > top-3){
-    if(kind==="desert") return SAND;
+    if(lake || kind==="desert") return SAND;
     if(kind==="mountains") return STONE;
     return DIRT;
   }
@@ -375,7 +375,8 @@ atlasTex.magFilter = THREE.NearestFilter;
 atlasTex.minFilter = THREE.NearestFilter;
 atlasTex.generateMipmaps = false;
 atlasTex.flipY = false;
-const atlasMat = new THREE.MeshLambertMaterial({ map: atlasTex, side: THREE.DoubleSide });
+const atlasMat = new THREE.MeshLambertMaterial({ map: atlasTex, side: THREE.FrontSide });
+const atlasWaterMat = new THREE.MeshLambertMaterial({ map: atlasTex, side: THREE.DoubleSide, transparent:true, opacity:0.55, depthWrite:false });
 
 function tileFor(type, dir){
   if(type===GRASS) return dir==="py" ? [0,0] : dir==="ny" ? [2,0] : [1,0];
@@ -400,15 +401,51 @@ const FACES = {
   pz:{n:[0,0,1],  d:[0,0,1], v:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]]},
   nz:{n:[0,0,-1], d:[0,0,-1],v:[[1,0,0],[0,0,0],[0,1,0],[1,1,0]]},
 };
-const chunkMeshes = {};
+const chunkMeshes = {}; // key -> [mesh, ...] (通常ブロック用 + 水用)
 function chunkKey(cx,cz){ return cx+","+cz; }
+
+function faceUV(dir, lx,ly,lz, u0,u1,v0,v1){
+  // 面ごとに「横方向」「縦方向」に使うローカル座標を選び、頂点順序に依存せず正しいUVを計算する
+  let uu, vv;
+  if(dir==="px" || dir==="nx"){ uu = lz; vv = 1-ly; }
+  else if(dir==="pz" || dir==="nz"){ uu = lx; vv = 1-ly; }
+  else { uu = lx; vv = lz; } // py / ny
+  return [u0 + uu*(u1-u0), v0 + vv*(v1-v0)];
+}
+
+function newBucket(){ return { positions:[], normals:[], uvs:[], indices:[], vcount:0 }; }
+function pushFace(bucket, t, dir, f, x,y,z){
+  const [col,row] = tileFor(t,dir);
+  const u0=col/ATLAS_COLS, u1=(col+1)/ATLAS_COLS, v0=row/ATLAS_ROWS, v1=(row+1)/ATLAS_ROWS;
+  for(let i=0;i<4;i++){
+    const lv = f.v[i];
+    bucket.positions.push(x+lv[0], y+lv[1], z+lv[2]);
+    bucket.normals.push(f.n[0],f.n[1],f.n[2]);
+    const [uu,vv] = faceUV(dir, lv[0], lv[1], lv[2], u0,u1,v0,v1);
+    bucket.uvs.push(uu, vv);
+  }
+  const vc = bucket.vcount;
+  bucket.indices.push(vc,vc+1,vc+2, vc,vc+2,vc+3);
+  bucket.vcount += 4;
+}
+function makeMeshFromBucket(bucket, mat){
+  if(bucket.vcount===0) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(bucket.positions,3));
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(bucket.normals,3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(bucket.uvs,2));
+  geo.setIndex(bucket.indices);
+  return new THREE.Mesh(geo, mat);
+}
 
 function buildChunk(cx,cz){
   const key = chunkKey(cx,cz);
-  if(chunkMeshes[key]){ scene.remove(chunkMeshes[key]); chunkMeshes[key].geometry.dispose(); delete chunkMeshes[key]; }
+  if(chunkMeshes[key]){
+    chunkMeshes[key].forEach(m=>{ scene.remove(m); m.geometry.dispose(); });
+    delete chunkMeshes[key];
+  }
 
-  const positions=[], normals=[], uvs=[], indices=[];
-  let vcount=0;
+  const solid = newBucket(), water = newBucket();
   const x0=cx*CHUNK_SIZE, z0=cz*CHUNK_SIZE;
 
   for(let x=x0; x<x0+CHUNK_SIZE; x++){
@@ -416,33 +453,26 @@ function buildChunk(cx,cz){
       for(let y=MIN_Y; y<=MAX_Y; y++){
         const t = getBlock(x,y,z);
         if(t===AIR) continue;
+        const isWater = (t===WATER);
         for(const dir in FACES){
           const f = FACES[dir];
           const nb = getBlock(x+f.d[0], y+f.d[1], z+f.d[2]);
-          if(nb!==AIR) continue;
-          const [col,row] = tileFor(t,dir);
-          const u0=col/ATLAS_COLS, u1=(col+1)/ATLAS_COLS, v0=row/ATLAS_ROWS, v1=(row+1)/ATLAS_ROWS;
-          const uvSet = [[u0,v1],[u1,v1],[u1,v0],[u0,v0]];
-          for(let i=0;i<4;i++){
-            positions.push(x+f.v[i][0], y+f.v[i][1], z+f.v[i][2]);
-            normals.push(f.n[0],f.n[1],f.n[2]);
-            uvs.push(uvSet[i][0], uvSet[i][1]);
-          }
-          indices.push(vcount,vcount+1,vcount+2, vcount,vcount+2,vcount+3);
-          vcount += 4;
+          // 水は「隣が空気の面」だけ、固体ブロックは「隣が空気 or 水の面」を描画する
+          // (これをしないと水中の地面が消えて奈落のように見えてしまう)
+          const visible = isWater ? (nb===AIR) : (nb===AIR || nb===WATER);
+          if(!visible) continue;
+          pushFace(isWater ? water : solid, t, dir, f, x,y,z);
         }
       }
     }
   }
-  if(vcount===0) return;
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions,3));
-  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals,3));
-  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs,2));
-  geo.setIndex(indices);
-  const mesh = new THREE.Mesh(geo, atlasMat);
-  scene.add(mesh);
-  chunkMeshes[key] = mesh;
+
+  const meshes = [];
+  const solidMesh = makeMeshFromBucket(solid, atlasMat);
+  if(solidMesh){ scene.add(solidMesh); meshes.push(solidMesh); }
+  const waterMesh = makeMeshFromBucket(water, atlasWaterMat);
+  if(waterMesh){ scene.add(waterMesh); meshes.push(waterMesh); }
+  if(meshes.length) chunkMeshes[key] = meshes;
 }
 
 const buildQueue = [], buildQueueSet = new Set();
@@ -472,7 +502,8 @@ function updateChunks(px,pz,now){
   Object.keys(chunkMeshes).forEach(k=>{
     const [cx,cz] = k.split(",").map(Number);
     if(Math.max(Math.abs(cx-pcx), Math.abs(cz-pcz)) > RENDER_DIST+1){
-      scene.remove(chunkMeshes[k]); chunkMeshes[k].geometry.dispose(); delete chunkMeshes[k];
+      chunkMeshes[k].forEach(m=>{ scene.remove(m); m.geometry.dispose(); });
+      delete chunkMeshes[k];
     }
   });
 }
@@ -593,7 +624,7 @@ const raycaster = new THREE.Raycaster();
 raycaster.far = 6;
 function raycastBlock(){
   raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
-  const meshes = Object.values(chunkMeshes);
+  const meshes = Object.values(chunkMeshes).flat();
   const hits = raycaster.intersectObjects(meshes, false);
   if(!hits.length) return null;
   const hit = hits[0];
@@ -687,8 +718,16 @@ function animate(){
     vx=(strafe*cosY - forward*sinY)*SPEED;
     vz=(-strafe*sinY - forward*cosY)*SPEED;
   }
-  player.vel.y -= GRAVITY*dt;
-  if(input.jump){ if(player.onGround){ player.vel.y=JUMP_V; player.onGround=false; } input.jump=false; }
+  const inWater = getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+0.3), Math.floor(player.pos.z)) === WATER
+               || getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+1.4), Math.floor(player.pos.z)) === WATER;
+  if(inWater){
+    player.vel.y -= GRAVITY*0.25*dt;
+    player.vel.y = Math.max(player.vel.y, -2.2);
+    if(input.jump){ player.vel.y = 3.0; input.jump=false; }
+  } else {
+    player.vel.y -= GRAVITY*dt;
+    if(input.jump){ if(player.onGround){ player.vel.y=JUMP_V; player.onGround=false; } input.jump=false; }
+  }
 
   let nx = player.pos.x + vx*dt;
   if(!collides(nx, player.pos.y, player.pos.z)) player.pos.x = nx;
