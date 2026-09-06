@@ -74,6 +74,7 @@
     display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff;
   }
   .abtn:active { background:rgba(20,20,20,.75); }
+  .abtn.active { background:#5c9e2f; border-color:#fff; box-shadow:0 0 8px rgba(255,255,255,.7); }
   #jumpBtn { width:58px; height:58px; font-size:11px; font-weight:700; }
 
   /* ホットバー */
@@ -126,6 +127,7 @@
       <div class="actionCol">
         <div class="abtn" id="breakBtn">⛏</div>
         <div class="abtn" id="placeBtn">▦</div>
+        <div class="abtn" id="sneakBtn">⬇︎</div>
       </div>
       <div class="abtn" id="jumpBtn">JUMP</div>
     </div>
@@ -212,7 +214,7 @@ const RENDER_DIST = 2;          // チャンク単位の描画距離 (5x5チャ�
 const SEA_LEVEL = 4;
 const MIN_Y = -1, MAX_Y = 22;
 
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, WOODTOP=5, LEAVES=6, SNOW=7, WATER=8;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, WOODTOP=5, LEAVES=6, SNOW=7, WATER=8, BEDROCK=9;
 
 const overrides = new Map(); // "x,y,z" -> type  (Firebaseで同期される差分)
 const heightCache = new Map();
@@ -276,7 +278,7 @@ function treeBlockAt(x,y,z){
 }
 
 function getBaseBlock(x,y,z){
-  if(y < MIN_Y) return STONE;
+  if(y <= MIN_Y) return BEDROCK;
   if(y > MAX_Y) return AIR;
   const b = biomeAt(x,z);
   const kind = biomeKind(b);
@@ -325,7 +327,8 @@ scene.fog = new THREE.Fog(0x8fc7f0, 20, 42);
 const camera = new THREE.PerspectiveCamera(72, 16/9, 0.05, 60);
 camera.rotation.order = "YXZ";
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5a3f, 0.9));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a3f, 0.9);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff3d0, 0.85);
 sun.position.set(15,25,10);
 scene.add(sun);
@@ -343,7 +346,7 @@ applyOrientation();
 /* =========================================================
    テクスチャアトラス (5列x2行 / 16pxタイル / 自前生成でドット絵風に)
    ========================================================= */
-const ATLAS_COLS=5, ATLAS_ROWS=2, TILE=16;
+const ATLAS_COLS=5, ATLAS_ROWS=3, TILE=16;
 const atlasCanvas = document.createElement("canvas");
 atlasCanvas.width = ATLAS_COLS*TILE; atlasCanvas.height = ATLAS_ROWS*TILE;
 const actx = atlasCanvas.getContext("2d");
@@ -369,6 +372,7 @@ actx.strokeStyle="#a98050"; for(let r=2;r<8;r+=2){ actx.beginPath(); actx.arc(1*
 noiseTile(2,1,["#3f8f3a","#357a31","#4aa143","#2f6e2c"]);
 noiseTile(3,1,["#f5f8ff","#e7edf7","#ffffff"]);
 noiseTile(4,1,["#3a7bd5","#3567b0","#4488e0"]);
+noiseTile(0,2,["#2b2b2e","#232326","#333336","#1c1c1e"]);
 
 const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter;
@@ -387,6 +391,7 @@ function tileFor(type, dir){
   if(type===LEAVES) return [2,1];
   if(type===SNOW) return [3,1];
   if(type===WATER) return [4,1];
+  if(type===BEDROCK) return [0,2];
   return [3,0];
 }
 
@@ -534,6 +539,7 @@ const player = {
   yaw: 0, pitch: -0.1,
   onGround: false,
   eyeHeight: 1.6,
+  sneaking: false,
 };
 function collides(px,py,pz){
   const r = 0.28;
@@ -601,6 +607,13 @@ const input = { moveX:0, moveY:0, jump:false };
 document.getElementById("jumpBtn").addEventListener("touchstart", e=>{e.preventDefault(); input.jump=true;}, {passive:false});
 document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump=true);
 
+(function setupSneak(){
+  const btn = document.getElementById("sneakBtn");
+  function toggle(){ player.sneaking = !player.sneaking; btn.classList.toggle("active", player.sneaking); }
+  btn.addEventListener("touchstart", e=>{ e.preventDefault(); toggle(); }, {passive:false});
+  btn.addEventListener("mousedown", toggle);
+})();
+
 let selectedType = GRASS;
 const HOTBAR_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
 (function setupHotbar(){
@@ -620,11 +633,20 @@ const HOTBAR_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
   });
 })();
 
+const highlightBox = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004,1.004,1.004)),
+  new THREE.LineBasicMaterial({ color:0x000000 })
+);
+highlightBox.visible = false;
+highlightBox.renderOrder = 999;
+scene.add(highlightBox);
+
 const raycaster = new THREE.Raycaster();
 raycaster.far = 6;
 function raycastBlock(){
   raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
-  const meshes = Object.values(chunkMeshes).flat();
+  // 水は透明な非実体として扱うのでレイキャスト対象から除外する(＝水は掘れない/水越しに奥を狙える)
+  const meshes = Object.values(chunkMeshes).flat().filter(m => m.material !== atlasWaterMat);
   const hits = raycaster.intersectObjects(meshes, false);
   if(!hits.length) return null;
   const hit = hits[0];
@@ -632,7 +654,12 @@ function raycastBlock(){
   const p = hit.point.clone().addScaledVector(n, -0.5);
   return { x:Math.floor(p.x), y:Math.floor(p.y), z:Math.floor(p.z), normal:n };
 }
-function doBreak(){ const h=raycastBlock(); if(h) pushBlockChange(h.x,h.y,h.z,AIR); }
+function doBreak(){
+  const h=raycastBlock(); if(!h) return;
+  const t = getBlock(h.x,h.y,h.z);
+  if(t===AIR || t===WATER || t===BEDROCK) return; // 水・岩盤は掘れない
+  pushBlockChange(h.x,h.y,h.z,AIR);
+}
 function doPlace(){
   const h = raycastBlock(); if(!h) return;
   const nx=h.x+Math.round(h.normal.x), ny=h.y+Math.round(h.normal.y), nz=h.z+Math.round(h.normal.z);
@@ -701,22 +728,66 @@ playersRef.on("value", snap=>{
    メインループ
    ========================================================= */
 const clock = new THREE.Clock();
-const SPEED=4.3, GRAVITY=20, JUMP_V=7.2;
+const SPEED=4.3, GRAVITY=20, JUMP_V=7.2, STEP_HEIGHT=1.02;
 let fpsCount=0, fpsTimer=0, lastHudUpdate=0;
+
+// 足元に地面(空気・水以外)があるかどうかを調べる(スニーク中の縁保護に使用)
+function hasFooting(px,pz,py){
+  const r=0.28;
+  for(const dx of [-r,r]) for(const dz of [-r,r]){
+    const t = getBlock(Math.floor(px+dx), Math.floor(py-0.05), Math.floor(pz+dz));
+    if(t!==AIR && t!==WATER) return true;
+  }
+  return false;
+}
+// 1軸分の移動を試みる。ぶつかったら1段までは自動で登る(水→陸に上がれない問題の対策)。
+// スニーク中は今の足場から落ちる方向には進ませない。
+function resolveAxis(candX, candZ){
+  if(!collides(candX, player.pos.y, candZ)){
+    if(player.sneaking && player.onGround && !hasFooting(candX, candZ, player.pos.y)) return false;
+    return true;
+  }
+  if(!collides(candX, player.pos.y+STEP_HEIGHT, candZ) && !collides(player.pos.x, player.pos.y+STEP_HEIGHT, player.pos.z)){
+    player.pos.y += STEP_HEIGHT;
+    if(player.vel.y < 0) player.vel.y = 0;
+    return true;
+  }
+  return false;
+}
+
+// 昼夜サイクル
+const DAY_CYCLE_MS = 8*60*1000; // 1周8分
+const skyDay = new THREE.Color(0x8fc7f0), skyNight = new THREE.Color(0x0b1026);
+const tmpSkyColor = new THREE.Color();
+function updateDayNight(now){
+  const t = (now % DAY_CYCLE_MS) / DAY_CYCLE_MS;
+  const angle = t * Math.PI * 2;
+  const height = Math.sin(angle);
+  const daylight = Math.max(0, height);
+  sun.position.set(Math.cos(angle)*30, height*30+8, 14);
+  sun.intensity = 0.15 + 0.75*daylight;
+  hemi.intensity = 0.25 + 0.65*daylight;
+  tmpSkyColor.copy(skyNight).lerp(skyDay, daylight);
+  scene.background = tmpSkyColor;
+  scene.fog.color.copy(tmpSkyColor);
+}
 
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
+  const now = performance.now();
 
   camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
+  updateDayNight(now);
 
   const forward=-input.moveY, strafe=input.moveX;
   const mag = Math.min(1, Math.hypot(forward,strafe));
   let vx=0, vz=0;
   if(mag>0.05){
     const sinY=Math.sin(player.yaw), cosY=Math.cos(player.yaw);
-    vx=(strafe*cosY - forward*sinY)*SPEED;
-    vz=(-strafe*sinY - forward*cosY)*SPEED;
+    const spd = SPEED * (player.sneaking ? 0.5 : 1);
+    vx=(strafe*cosY - forward*sinY)*spd;
+    vz=(-strafe*sinY - forward*cosY)*spd;
   }
   const inWater = getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+0.3), Math.floor(player.pos.z)) === WATER
                || getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+1.4), Math.floor(player.pos.z)) === WATER;
@@ -730,17 +801,17 @@ function animate(){
   }
 
   let nx = player.pos.x + vx*dt;
-  if(!collides(nx, player.pos.y, player.pos.z)) player.pos.x = nx;
+  if(resolveAxis(nx, player.pos.z)) player.pos.x = nx;
   let nz = player.pos.z + vz*dt;
-  if(!collides(player.pos.x, player.pos.y, nz)) player.pos.z = nz;
+  if(resolveAxis(player.pos.x, nz)) player.pos.z = nz;
+
   let ny = player.pos.y + player.vel.y*dt;
   if(!collides(player.pos.x, ny, player.pos.z)){ player.pos.y = ny; player.onGround=false; }
   else { if(player.vel.y<0) player.onGround=true; player.vel.y=0; }
   if(player.pos.y < -8){ player.pos.set(player.pos.x, terrainHeight(Math.round(player.pos.x),Math.round(player.pos.z))+3, player.pos.z); player.vel.set(0,0,0); }
 
-  camera.position.set(player.pos.x, player.pos.y + player.eyeHeight, player.pos.z);
+  camera.position.set(player.pos.x, player.pos.y + (player.sneaking ? player.eyeHeight-0.2 : player.eyeHeight), player.pos.z);
 
-  const now = performance.now();
   updateChunks(player.pos.x, player.pos.z, now);
   if(buildQueue.length){
     const [cx,cz] = buildQueue.shift();
@@ -748,6 +819,11 @@ function animate(){
     buildChunk(cx,cz);
   }
   sendMyState(now);
+
+  // 狙っているブロックの枠を表示
+  const target = raycastBlock();
+  if(target){ highlightBox.visible = true; highlightBox.position.set(target.x+0.5, target.y+0.5, target.z+0.5); }
+  else highlightBox.visible = false;
 
   renderer.render(scene, camera);
 
