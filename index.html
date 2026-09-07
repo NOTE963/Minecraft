@@ -53,8 +53,6 @@
 
   #topBar { position:absolute; top:6px; left:6px; right:6px; display:flex; justify-content:space-between; align-items:flex-start; font-size:10px; color:#fff; text-shadow:1px 1px 2px rgba(0,0,0,.8); gap:6px; }
   #playerList { background:rgba(0,0,0,.35); padding:3px 7px; border-radius:6px; max-width:38vw; line-height:1.5; }
-  #hpBar { font-size:13px; letter-spacing:-2px; margin-top:2px; text-shadow:1px 1px 2px rgba(0,0,0,.8); }
-  #damageFlash { position:absolute; inset:0; background:rgba(255,0,0,0); pointer-events:none; transition:background .1s; }
   #coordBox { background:rgba(0,0,0,.4); padding:3px 8px; border-radius:6px; text-align:right; line-height:1.5; font-family:monospace; white-space:nowrap; }
   #biomeTag { color:#ffe08a; }
 
@@ -91,6 +89,32 @@
   .hotslot.selected { border-color:#fff; box-shadow:0 0 6px rgba(255,255,255,.9); }
   .hotslot canvas { width:100%; height:100%; image-rendering:pixelated; }
 
+  #invBtn {
+    position:absolute; bottom:78px; left:12px; width:34px; height:34px; border-radius:6px;
+    background:rgba(0,0,0,.4); border:2px solid rgba(255,255,255,.5); color:#fff; font-size:16px;
+    display:flex; align-items:center; justify-content:center; pointer-events:auto;
+  }
+  #inventoryPanel {
+    position:absolute; inset:0; z-index:40; background:rgba(0,0,0,.55);
+    display:none; align-items:center; justify-content:center; pointer-events:auto;
+  }
+  #inventoryPanel.open { display:flex; }
+  #invBox {
+    background:#3a3a3ee6; border:3px solid #1c1c1e; border-radius:10px; padding:14px;
+    max-width:90vw; max-height:80vh; overflow:auto;
+  }
+  #invBox h3 { color:#fff; font-size:13px; margin-bottom:8px; text-align:center; }
+  #invGrid { display:grid; grid-template-columns:repeat(6, 40px); gap:6px; }
+  .invSlot {
+    width:40px; height:40px; border-radius:5px; border:2px solid rgba(255,255,255,.4);
+    background:#555; overflow:hidden; cursor:pointer;
+  }
+  .invSlot canvas { width:100%; height:100%; image-rendering:pixelated; }
+  #invCloseBtn {
+    display:block; margin:10px auto 0; padding:6px 20px; font-size:12px; border-radius:6px;
+    background:#5c9e2f; border:2px solid #3d6b1f; color:#fff;
+  }
+
   #lookLayer { position:absolute; inset:0; pointer-events:auto; }
   #fpsBadge { font-size:9px; opacity:.6; color:#fff; margin-top:2px; }
 </style>
@@ -110,11 +134,9 @@
 
   <div id="hud">
     <div id="crosshair"></div>
-    <div id="damageFlash"></div>
     <div id="topBar">
       <div>
         <div id="playerList">👥 読込中...</div>
-        <div id="hpBar">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
         <div id="fpsBadge"></div>
         <div id="flyTag" style="display:none;color:#7ecbff;font-weight:700;">✈ 飛行モード</div>
       </div>
@@ -127,11 +149,18 @@
 
     <div id="lookLayer"></div>
     <div id="hotbar"></div>
+    <div id="invBtn">🎒</div>
+    <div id="inventoryPanel">
+      <div id="invBox">
+        <h3>🎒 インベントリ (タップして選択)</h3>
+        <div id="invGrid"></div>
+        <button id="invCloseBtn">閉じる</button>
+      </div>
+    </div>
     <div id="joyBase"><div id="joyStick"></div></div>
 
     <div id="actionArea">
       <div class="actionCol">
-        <div class="abtn" id="attackBtn">⚔️</div>
         <div class="abtn" id="breakBtn">⛏</div>
         <div class="abtn" id="placeBtn">▦</div>
         <div class="abtn" id="sneakBtn">⬇︎</div>
@@ -221,7 +250,8 @@ const RENDER_DIST = 2;          // チャンク単位の描画距離 (5x5チャ�
 const SEA_LEVEL = 4;
 const MIN_Y = -1, MAX_Y = 22;
 
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, WOODTOP=5, LEAVES=6, SNOW=7, WATER=8, BEDROCK=9;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, WOODTOP=5, LEAVES=6, SNOW=7, WATER=8, BEDROCK=9, COBBLE=10, PLANK=11, BRICK=12, GLASS=13;
+const TRANSPARENT_TYPES = new Set([WATER, GLASS]);
 
 const overrides = new Map(); // "x,y,z" -> type  (Firebaseで同期される差分)
 const heightCache = new Map();
@@ -364,6 +394,24 @@ noiseTile(2,1,["#3f8f3a","#357a31","#4aa143","#2f6e2c"]);
 noiseTile(3,1,["#f5f8ff","#e7edf7","#ffffff"]);
 noiseTile(4,1,["#3a7bd5","#3567b0","#4488e0"]);
 noiseTile(0,2,["#2b2b2e","#232326","#333336","#1c1c1e"]);
+// 丸石(cobblestone)
+noiseTile(1,2,["#9a9a9a","#7d7d7d","#adadad","#6c6c6c","#8a8a8a"]);
+for(let i=0;i<10;i++){ actx.fillStyle="#5f5f5f"; actx.fillRect(1*TILE+Math.floor(Math.random()*13), 2*TILE+Math.floor(Math.random()*13), 3,3); }
+// 板材(plank)
+actx.fillStyle="#c9a066"; actx.fillRect(2*TILE,2*TILE,TILE,TILE);
+for(let yy=0;yy<TILE;yy+=4){ actx.fillStyle="#a9824c"; actx.fillRect(2*TILE,2*TILE+yy,TILE,1); }
+for(let xx=2;xx<TILE;xx+=6){ actx.fillStyle="#b8925a"; actx.fillRect(2*TILE+xx,2*TILE,1,TILE); }
+// レンガ(brick)
+actx.fillStyle="#9a4a3a"; actx.fillRect(3*TILE,2*TILE,TILE,TILE);
+actx.strokeStyle="#5a2a20"; actx.lineWidth=1;
+for(let ry=0;ry<TILE;ry+=4){
+  const offset = (ry/4)%2===0 ? 0 : 4;
+  actx.beginPath(); actx.moveTo(3*TILE, 2*TILE+ry); actx.lineTo(3*TILE+TILE, 2*TILE+ry); actx.stroke();
+  for(let bx=-offset; bx<TILE; bx+=8){ actx.beginPath(); actx.moveTo(3*TILE+bx, 2*TILE+ry); actx.lineTo(3*TILE+bx, 2*TILE+ry+4); actx.stroke(); }
+}
+// ガラス(glass、半透明素材と組み合わせて使う)
+actx.fillStyle="#eaf6ff"; actx.fillRect(4*TILE,2*TILE,TILE,TILE);
+actx.strokeStyle="#c9e6f5"; actx.strokeRect(4*TILE+1,2*TILE+1,TILE-2,TILE-2);
 
 const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter;
@@ -381,6 +429,10 @@ function tileFor(type, dir){
   if(type===WOOD) return (dir==="py"||dir==="ny") ? [1,1] : [0,1];
   if(type===LEAVES) return [2,1];
   if(type===SNOW) return [3,1];
+  if(type===COBBLE) return [1,2];
+  if(type===PLANK) return [2,2];
+  if(type===BRICK) return [3,2];
+  if(type===GLASS) return [4,2];
   if(type===WATER) return [4,1];
   if(type===BEDROCK) return [0,2];
   return [3,0];
@@ -449,15 +501,16 @@ function buildChunk(cx,cz){
       for(let y=MIN_Y; y<=MAX_Y; y++){
         const t = getBlock(x,y,z);
         if(t===AIR) continue;
-        const isWater = (t===WATER);
+        const isTrans = TRANSPARENT_TYPES.has(t);
         for(const dir in FACES){
           const f = FACES[dir];
           const nb = getBlock(x+f.d[0], y+f.d[1], z+f.d[2]);
-          // 水は「隣が空気の面」だけ、固体ブロックは「隣が空気 or 水の面」を描画する
-          // (これをしないと水中の地面が消えて奈落のように見えてしまう)
-          const visible = isWater ? (nb===AIR) : (nb===AIR || nb===WATER);
+          const nbTrans = TRANSPARENT_TYPES.has(nb);
+          // 透明ブロック(水・ガラス)は同じ種類同士の面は消し、違う種類 or 空気に接する面だけ描く。
+          // 固体ブロックは「隣が空気 or 透明ブロック」なら面を描く(これがないと水中/ガラス越しの地面が消えて奈落に見える)
+          const visible = isTrans ? (nb===AIR || (nbTrans && nb!==t)) : (nb===AIR || nbTrans);
           if(!visible) continue;
-          pushFace(isWater ? water : solid, t, dir, f, x,y,z);
+          pushFace(isTrans ? water : solid, t, dir, f, x,y,z);
         }
       }
     }
@@ -531,39 +584,9 @@ const player = {
   onGround: false,
   eyeHeight: 1.6,
   sneaking: false,
-  hp: 20, maxHp: 20,
-  fallStartY: null,
-  dead: false,
+  flying: false,
 };
 
-function flashDamage(){
-  const el = document.getElementById("damageFlash");
-  el.style.background = "rgba(255,0,0,.35)";
-  setTimeout(()=>{ el.style.background = "rgba(255,0,0,0)"; }, 150);
-}
-function updateHpBar(){
-  const hearts = Math.round(player.hp/2);
-  document.getElementById("hpBar").textContent = "❤️".repeat(Math.max(0,hearts)) + "🖤".repeat(Math.max(0,10-hearts));
-}
-function damagePlayer(amount){
-  if(player.dead) return;
-  player.hp = Math.max(0, player.hp - amount);
-  flashDamage();
-  updateHpBar();
-  if(player.hp <= 0) respawnPlayer();
-}
-function respawnPlayer(){
-  player.dead = true;
-  setTimeout(()=>{
-    player.pos.set(0, terrainHeight(0,0)+3, 0);
-    player.vel.set(0,0,0);
-    player.hp = player.maxHp;
-    player.fallStartY = null;
-    player.dead = false;
-    updateHpBar();
-  }, 800);
-}
-updateHpBar();
 function collides(px,py,pz){
   const r = 0.28;
   const heights = [0.05, 0.9, 1.55];
@@ -648,28 +671,76 @@ document.getElementById("jumpBtn").addEventListener("mouseup", ()=> input.jumpHe
 
 (function setupSneak(){
   const btn = document.getElementById("sneakBtn");
-  function toggle(){ player.sneaking = !player.sneaking; btn.classList.toggle("active", player.sneaking); }
-  btn.addEventListener("touchstart", e=>{ e.preventDefault(); toggle(); }, {passive:false});
-  btn.addEventListener("mousedown", toggle);
+  function press(){
+    if(player.flying){
+      player.sneaking = true; btn.classList.add("active");
+    } else {
+      player.sneaking = !player.sneaking; btn.classList.toggle("active", player.sneaking);
+    }
+  }
+  function release(){
+    if(player.flying){ player.sneaking = false; btn.classList.remove("active"); }
+  }
+  btn.addEventListener("touchstart", e=>{ e.preventDefault(); press(); }, {passive:false});
+  btn.addEventListener("touchend", e=>{ e.preventDefault(); release(); }, {passive:false});
+  btn.addEventListener("mousedown", press);
+  btn.addEventListener("mouseup", release);
 })();
 
 let selectedType = GRASS;
-const HOTBAR_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
+const HOTBAR_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, PLANK, COBBLE, LEAVES, SNOW];
+const ALL_BLOCK_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, PLANK, COBBLE, BRICK, GLASS, LEAVES, SNOW];
+
+function makeBlockIcon(t){
+  const c = document.createElement("canvas"); c.width=16; c.height=16;
+  const ctx = c.getContext("2d");
+  const [col,row] = tileFor(t,"py");
+  ctx.drawImage(atlasCanvas, col*TILE,row*TILE,TILE,TILE, 0,0,16,16);
+  return c;
+}
+function selectBlock(t){
+  selectedType = t;
+  Array.from(document.getElementById("hotbar").children).forEach(ch=>{
+    ch.classList.toggle("selected", +ch.dataset.type === t);
+  });
+}
+
 (function setupHotbar(){
   const bar = document.getElementById("hotbar");
   HOTBAR_TYPES.forEach((t,i)=>{
     const slot = document.createElement("div");
     slot.className = "hotslot" + (i===0?" selected":"");
-    const c = document.createElement("canvas"); c.width=16; c.height=16;
-    const ctx = c.getContext("2d");
-    const [col,row] = tileFor(t,"py");
-    ctx.drawImage(atlasCanvas, col*TILE,row*TILE,TILE,TILE, 0,0,16,16);
-    slot.appendChild(c);
-    function select(){ selectedType=t; Array.from(bar.children).forEach(ch=>ch.classList.remove("selected")); slot.classList.add("selected"); }
+    slot.dataset.type = t;
+    slot.appendChild(makeBlockIcon(t));
+    function select(){ selectBlock(t); }
     slot.addEventListener("touchstart", e=>{e.preventDefault(); select();}, {passive:false});
     slot.addEventListener("mousedown", select);
     bar.appendChild(slot);
   });
+})();
+
+(function setupInventory(){
+  const btn = document.getElementById("invBtn");
+  const panel = document.getElementById("inventoryPanel");
+  const grid = document.getElementById("invGrid");
+  const closeBtn = document.getElementById("invCloseBtn");
+
+  ALL_BLOCK_TYPES.forEach(t=>{
+    const slot = document.createElement("div");
+    slot.className = "invSlot";
+    slot.appendChild(makeBlockIcon(t));
+    function pick(){ selectBlock(t); panel.classList.remove("open"); }
+    slot.addEventListener("touchstart", e=>{e.preventDefault(); pick();}, {passive:false});
+    slot.addEventListener("mousedown", pick);
+    grid.appendChild(slot);
+  });
+
+  function open(){ panel.classList.add("open"); }
+  function close(){ panel.classList.remove("open"); }
+  btn.addEventListener("touchstart", e=>{e.preventDefault(); open();}, {passive:false});
+  btn.addEventListener("mousedown", open);
+  closeBtn.addEventListener("touchstart", e=>{e.preventDefault(); close();}, {passive:false});
+  closeBtn.addEventListener("mousedown", close);
 })();
 
 const highlightBox = new THREE.LineSegments(
@@ -684,14 +755,16 @@ const raycaster = new THREE.Raycaster();
 raycaster.far = 6;
 function raycastBlock(){
   raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
-  // 水は透明な非実体として扱うのでレイキャスト対象から除外する(＝水は掘れない/水越しに奥を狙える)
-  const meshes = Object.values(chunkMeshes).flat().filter(m => m.material !== atlasWaterMat);
+  const meshes = Object.values(chunkMeshes).flat();
   const hits = raycaster.intersectObjects(meshes, false);
-  if(!hits.length) return null;
-  const hit = hits[0];
-  const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
-  const p = hit.point.clone().addScaledVector(n, -0.5);
-  return { x:Math.floor(p.x), y:Math.floor(p.y), z:Math.floor(p.z), normal:n };
+  for(const hit of hits){
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+    const p = hit.point.clone().addScaledVector(n, -0.5);
+    const bx=Math.floor(p.x), by=Math.floor(p.y), bz=Math.floor(p.z);
+    if(getBlock(bx,by,bz) === WATER) continue; // 水は対象外にして奥/手前のブロックを狙う
+    return { x:bx, y:by, z:bz, normal:n };
+  }
+  return null;
 }
 function doBreak(){
   const h=raycastBlock(); if(!h) return;
