@@ -78,8 +78,11 @@
   #jumpBtn { width:58px; height:58px; font-size:11px; font-weight:700; }
 
   /* ホットバー */
-  #hotbar {
+  #hotbarRow {
     position:absolute; bottom:78px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:6px;
+  }
+  #hotbar {
     display:flex; gap:4px; background:rgba(0,0,0,.35); padding:5px; border-radius:8px; pointer-events:auto;
   }
   .hotslot {
@@ -90,8 +93,9 @@
   .hotslot canvas { width:100%; height:100%; image-rendering:pixelated; }
 
   #invBtn {
-    position:absolute; bottom:78px; left:12px; width:34px; height:34px; border-radius:6px;
-    background:rgba(0,0,0,.4); border:2px solid rgba(255,255,255,.5); color:#fff; font-size:16px;
+    width:34px; height:34px; border-radius:6px;
+    background:rgba(0,0,0,.4); border:2px solid rgba(255,255,255,.5); color:#fff;
+    font-size:18px; letter-spacing:2px; line-height:1;
     display:flex; align-items:center; justify-content:center; pointer-events:auto;
   }
   #inventoryPanel {
@@ -148,8 +152,10 @@
     </div>
 
     <div id="lookLayer"></div>
-    <div id="hotbar"></div>
-    <div id="invBtn">🎒</div>
+    <div id="hotbarRow">
+      <div id="hotbar"></div>
+      <div id="invBtn">•••</div>
+    </div>
     <div id="inventoryPanel">
       <div id="invBox">
         <h3>🎒 インベントリ (タップして選択)</h3>
@@ -250,7 +256,8 @@ const RENDER_DIST = 2;          // チャンク単位の描画距離 (5x5チャ�
 const SEA_LEVEL = 4;
 const MIN_Y = -1, MAX_Y = 22;
 
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, WOODTOP=5, LEAVES=6, SNOW=7, WATER=8, BEDROCK=9, COBBLE=10, PLANK=11, BRICK=12, GLASS=13;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, WOODTOP=5, LEAVES=6, SNOW=7, WATER=8, BEDROCK=9, COBBLE=10, PLANK=11, BRICK=12, GLASS=13,
+      GRAVEL=14, CLAY=15, OBSIDIAN=16, PUMPKIN=17, MOSSY=18, WOOL_RED=19, WOOL_BLUE=20, WOOL_YELLOW=21, IRON=22, GOLD=23;
 const TRANSPARENT_TYPES = new Set([WATER, GLASS]);
 
 const overrides = new Map(); // "x,y,z" -> type  (Firebaseで同期される差分)
@@ -367,7 +374,7 @@ applyOrientation();
 /* =========================================================
    テクスチャアトラス (5列x2行 / 16pxタイル / 自前生成でドット絵風に)
    ========================================================= */
-const ATLAS_COLS=5, ATLAS_ROWS=3, TILE=16;
+const ATLAS_COLS=5, ATLAS_ROWS=5, TILE=16;
 const atlasCanvas = document.createElement("canvas");
 atlasCanvas.width = ATLAS_COLS*TILE; atlasCanvas.height = ATLAS_ROWS*TILE;
 const actx = atlasCanvas.getContext("2d");
@@ -413,6 +420,29 @@ for(let ry=0;ry<TILE;ry+=4){
 actx.fillStyle="#eaf6ff"; actx.fillRect(4*TILE,2*TILE,TILE,TILE);
 actx.strokeStyle="#c9e6f5"; actx.strokeRect(4*TILE+1,2*TILE+1,TILE-2,TILE-2);
 
+// --- 追加ブロック (行3・行4) ---
+// 砂利(gravel)
+noiseTile(0,3,["#8d8d8d","#767676","#6e6a63","#9c9c9c","#5d5a54"]);
+// 粘土(clay)
+noiseTile(1,3,["#9fa8b0","#8f98a0","#a8b0b8","#98a1a8"]);
+// 黒曜石(obsidian)
+noiseTile(2,3,["#140a1e","#1c0f28","#0e0616","#241236","#2c1640"]);
+// かぼちゃ(pumpkin)
+actx.fillStyle="#d97a1f"; actx.fillRect(3*TILE,3*TILE,TILE,TILE);
+for(let xx=1;xx<TILE;xx+=4){ actx.fillStyle="#b8621a"; actx.fillRect(3*TILE+xx,3*TILE,2,TILE); }
+// 苔むした丸石(mossy cobblestone)
+noiseTile(4,3,["#7d8d6e","#6a7a5c","#8fa07e","#59684d","#7d7d7d"]);
+// 赤色の羊毛(wool red)
+noiseTile(0,4,["#b83a3a","#a83030","#c24545","#9c2c2c"]);
+// 青色の羊毛(wool blue)
+noiseTile(1,4,["#3a5ab8","#3050a8","#4565c2","#2c4699"]);
+// 黄色の羊毛(wool yellow)
+noiseTile(2,4,["#e0c23a","#d0b030","#e8cc55","#c8a828"]);
+// 鉄ブロック(iron block)
+noiseTile(3,4,["#d8d8d8","#c8c8c8","#e8e8e8","#b8b8b8"]);
+// 金ブロック(gold block)
+noiseTile(4,4,["#e8c840","#d8b830","#f0d860","#c8a828"]);
+
 const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter;
 atlasTex.minFilter = THREE.NearestFilter;
@@ -433,6 +463,16 @@ function tileFor(type, dir){
   if(type===PLANK) return [2,2];
   if(type===BRICK) return [3,2];
   if(type===GLASS) return [4,2];
+  if(type===GRAVEL) return [0,3];
+  if(type===CLAY) return [1,3];
+  if(type===OBSIDIAN) return [2,3];
+  if(type===PUMPKIN) return [3,3];
+  if(type===MOSSY) return [4,3];
+  if(type===WOOL_RED) return [0,4];
+  if(type===WOOL_BLUE) return [1,4];
+  if(type===WOOL_YELLOW) return [2,4];
+  if(type===IRON) return [3,4];
+  if(type===GOLD) return [4,4];
   if(type===WATER) return [4,1];
   if(type===BEDROCK) return [0,2];
   return [3,0];
@@ -689,7 +729,7 @@ document.getElementById("jumpBtn").addEventListener("mouseup", ()=> input.jumpHe
 
 let selectedType = GRASS;
 const HOTBAR_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, PLANK, COBBLE, LEAVES, SNOW];
-const ALL_BLOCK_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, PLANK, COBBLE, BRICK, GLASS, LEAVES, SNOW];
+const ALL_BLOCK_TYPES = [GRASS, DIRT, STONE, SAND, WOOD, PLANK, COBBLE, MOSSY, BRICK, GLASS, LEAVES, SNOW, GRAVEL, CLAY, OBSIDIAN, PUMPKIN, WOOL_RED, WOOL_BLUE, WOOL_YELLOW, IRON, GOLD];
 
 function makeBlockIcon(t){
   const c = document.createElement("canvas"); c.width=16; c.height=16;
