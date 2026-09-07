@@ -100,10 +100,11 @@
 <div id="app">
   <div id="startScreen">
     <h1>⛏ Mini Craft Online</h1>
-    <p>チャンク式で無限に広がるワールド。砂漠・平原・森・雪山・湖など多様な地形が生成されます。ブロックの破壊/設置は他のプレイヤーとリアルタイム同期されます。</p>
+    <p>どこまでも続くフラットな草原ワールド。ブロックの破壊/設置は他のプレイヤーとリアルタイム同期されます。ジャンプボタンを素早く2回押すとクリエイティブ風の飛行モードになります。</p>
     <div id="rotateHint">📱 横画面推奨（縦持ちでも自動で横表示になります）</div>
     <input id="nameInput" maxlength="10" placeholder="ニックネーム">
     <button id="startBtn">ワールドに入る</button>
+    <button id="resetBtn" style="background:#a33;border-color:#722;color:#fff;padding:6px 16px;border-radius:6px;font-size:11px;">🗑 ワールドをリセット(過去の設置/破壊を全消去)</button>
     <div id="startStatus">Firebase接続待機中...</div>
   </div>
 
@@ -115,6 +116,7 @@
         <div id="playerList">👥 読込中...</div>
         <div id="hpBar">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
         <div id="fpsBadge"></div>
+        <div id="flyTag" style="display:none;color:#7ecbff;font-weight:700;">✈ 飛行モード</div>
       </div>
       <div id="coordBox">
         X:0 Y:0 Z:0<br>
@@ -575,7 +577,7 @@ function collides(px,py,pz){
 /* =========================================================
    入力処理 (移動スティック / 視点ドラッグ / ボタン)
    ========================================================= */
-const input = { moveX:0, moveY:0, jump:false };
+const input = { moveX:0, moveY:0, jump:false, jumpHeld:false };
 
 (function setupJoystick(){
   const base = document.getElementById("joyBase");
@@ -625,8 +627,24 @@ const input = { moveX:0, moveY:0, jump:false };
   layer.addEventListener("mousedown", e=>{ start(e); const mv=ev=>move(ev), up=ev=>{end(ev); removeEventListener("mousemove",mv); removeEventListener("mouseup",up);}; addEventListener("mousemove",mv); addEventListener("mouseup",up); });
 })();
 
-document.getElementById("jumpBtn").addEventListener("touchstart", e=>{e.preventDefault(); input.jump=true;}, {passive:false});
-document.getElementById("jumpBtn").addEventListener("mousedown", ()=> input.jump=true);
+let lastJumpTap = 0;
+function handleJumpPress(){
+  input.jump = true;
+  input.jumpHeld = true;
+  const now = performance.now();
+  if(now - lastJumpTap < 300){
+    player.flying = !player.flying;
+    player.vel.y = 0;
+    lastJumpTap = 0;
+    document.getElementById("flyTag").style.display = player.flying ? "inline" : "none";
+  } else {
+    lastJumpTap = now;
+  }
+}
+document.getElementById("jumpBtn").addEventListener("touchstart", e=>{e.preventDefault(); handleJumpPress();}, {passive:false});
+document.getElementById("jumpBtn").addEventListener("touchend", e=>{e.preventDefault(); input.jumpHeld=false;}, {passive:false});
+document.getElementById("jumpBtn").addEventListener("mousedown", handleJumpPress);
+document.getElementById("jumpBtn").addEventListener("mouseup", ()=> input.jumpHeld=false);
 
 (function setupSneak(){
   const btn = document.getElementById("sneakBtn");
@@ -812,7 +830,15 @@ function animate(){
   }
   const inWater = getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+0.3), Math.floor(player.pos.z)) === WATER
                || getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+1.4), Math.floor(player.pos.z)) === WATER;
-  if(inWater){
+  if(player.flying){
+    const flySpeed = 6;
+    let vy = 0;
+    if(input.jumpHeld) vy += flySpeed;
+    if(player.sneaking) vy -= flySpeed;
+    player.vel.y = vy;
+    player.onGround = false;
+    input.jump = false;
+  } else if(inWater){
     player.vel.y -= GRAVITY*0.25*dt;
     player.vel.y = Math.max(player.vel.y, -2.2);
     if(input.jump){ player.vel.y = 3.0; input.jump=false; }
@@ -871,6 +897,15 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   document.getElementById("hud").style.display = "block";
   applyOrientation();
   animate();
+});
+
+document.getElementById("resetBtn").addEventListener("click", ()=>{
+  if(!confirm("これまでに設置/破壊されたブロックの記録を全て消去します。よろしいですか？")) return;
+  db.ref(ROOM + "/blocks").remove().then(()=>{
+    alert("ワールドをリセットしました。");
+  }).catch(err=>{
+    alert("リセットに失敗しました: " + err.message);
+  });
 });
 
 })();
